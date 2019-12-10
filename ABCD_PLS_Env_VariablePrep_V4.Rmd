@@ -1,0 +1,1288 @@
+---
+title: "ABCD Environment PLS--Variable Setup_V3"
+author: "Carlos Cardenas-Iniguez"
+date: "9/23/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results = 'hide', message = F, warning = F)
+```
+## Setting up variables for PLS
+
+This document outlines how I've gathered variables from ABCD Curated Release 2.0.1. The general flow of the document will be to pull all relevant variables from each instrument, and then filter for the various models. 
+
+This script preps the data for use in all further analyses, including PCA, CCA, and SEM mediation models. 
+
+NOTE: This script works off the full release txt files, NOT DEAP 
+
+```{r libraries, echo = FALSE, results = 'hide'}
+
+library(dplyr); library(ggplot2); library(lme4); library(cvTools);  library(R.matlab); library(summarytools); library(readr);
+library(psych)
+library(lme4)
+library(stargazer)
+library(gvlma)
+library(extrafont)
+library(lattice)
+library(summarytools)
+library(dplyr)
+library(ade4)
+library(factoextra)
+library(magrittr)
+library(FactoMineR)
+library(tidyr)
+library(fastDummies) #useful for dummy_cols command
+
+# set directories for txt file locations and save location for csv
+data_dir <- "/Users/wesleymeredith/Documents/data/ABCD_release_2.0/"
+data_dir_subs <- "/Users/wesleymeredith/Documents/data/0_data_output/enviro_factors/enviro_output/"
+
+```
+In the following section, I will import the text file containing each variable, however, I am taking a two-step process, since the actual values do not begin until line 3. So: I first import the first line as the column names, and then combine that with the imported data using the `readr` package. 
+
+
+## DEmographic Variables
+
+This first section imports demographic variables, such as race, ethnicity, gender, and age.
+
+```{r Demographics, echo = FALSE, results= 'hide'}
+acspsw03_n <-   sprintf('%s/acspsw03.txt',data_dir) %>%
+  read_tsv(n_max = 0) %>% # default: col_names = TRUE
+  names()
+acspsw03  <- sprintf('%s/acspsw03.txt',data_dir) %>% 
+  read_tsv(skip = 2, col_names = acspsw03_n, na = c('','NA')) %>% 
+  filter(eventname=="baseline_year_1_arm_1")
+
+acspsw03$race_ethnicity <- factor(acspsw03$race_ethnicity, levels = 1:5,
+                                  labels = c("white", "black","hispanic","asian", "other"))
+
+colnames(acspsw03)[8] <- "gender"
+```
+
+
+### Before filtering the demographic variables, create list for excluding family-excluded subset using FamilyID
+
+In order to make sure that the nested structure of families does not contribute to the effects observed between environmental factors and working memory, a subset that has randomly excluded all family members besides one (if there are multiple) will be compared against the full sample. 
+
+```{r FamilyExclusion, echo = FALSE}
+
+family_idx <- data.frame()
+
+for (i in acspsw03$rel_family_id) {
+  tmp_ids <- (which(acspsw03$rel_family_id %in% i))
+  
+  family_idx <- rbind(tmp_ids[1], family_idx)
+  rm(tmp_ids)
+
+}
+
+family_idx  <- unique(family_idx)
+data.family <- acspsw03[family_idx$X1L, 5] #grab the src_family_id variable for the unique family members
+
+```
+
+### Now filter the demographic variables 
+
+```{r DemographicVariablesIncluded}
+acspsw03 <- acspsw03 %>% dummy_cols(ignore_na = TRUE, select_columns = c("race_ethnicity", "gender"))%>%
+  select(src_subject_id, 
+         interview_age,
+         gender_M,
+         gender_F,
+         race_ethnicity_white,
+         race_ethnicity_black,
+         race_ethnicity_hispanic,
+         race_ethnicity_asian,
+         race_ethnicity_other,
+         race_ethnicity,
+         gender)
+
+acspsw03_family <- acspsw03 %>%
+  filter(src_subject_id %in% data.family[[1]])
+```
+
+## Grab the WISC fluid intelligence scores and working memory scores
+
+```{r}
+
+fluid_int <- read.delim(paste(data_dir,"abcd_ps01.txt",sep=""), na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>% slice(-1) %>%
+  filter(eventname == "baseline_year_1_arm_1") %>%
+  select(src_subject_id, pea_wiscv_tss)
+
+# outcome_vars <- left_join(combined_measures_complete, fluid_int) %>%
+#   select(src_subject_id,
+#          nihtbx_list_uncorrected,
+#          pea_wiscv_tss)
+
+# outcome_vars_family <- outcome_vars %>%
+#   filter(src_subject_id %in% data.family[[1]])
+
+# write.csv(outcome_vars, sprintf('%s/ABCD_outcome_vars.csv',data_dir_subs), row.names = FALSE)
+# 
+# write.csv(outcome_vars_family, sprintf('%s/ABCD_outcome_vars_family.csv',data_dir_subs), row.names = FALSE)
+
+```
+
+## Socioeconomic Status Variables 
+
+In this section I import socioeconomic status variables. Since the data are collected in categories, I used the data in the ABCD-STUDY git-hub to create the three bins for household income, and 5 bins for the education variable.
+
+```{r SocioeconomicStatusVars, echo=FALSE}
+pdem02_n <-   sprintf('%s/pdem02.txt',data_dir) %>%
+  read_tsv(n_max = 0) %>% # default: col_names = TRUE
+  names()
+pdem02  <- sprintf('%s/pdem02.txt',data_dir) %>% 
+  read_tsv(skip = 2, col_names = pdem02_n, na = c('','NA'), guess_max = 11000) 
+
+household.income = pdem02$demo_comb_income_v2
+household.income[pdem02$demo_comb_income_v2 == "1"] = 1 #  Less than $5,000
+household.income[pdem02$demo_comb_income_v2 == "2"] = 2 # $5,000 through $11,999
+household.income[pdem02$demo_comb_income_v2 == "3"] = 3 # $12,000 through $15,999
+household.income[pdem02$demo_comb_income_v2 == "4"] = 4 # $16,000 through $24,999
+household.income[pdem02$demo_comb_income_v2 == "5"] = 5 # $25,000 through $34,999
+household.income[pdem02$demo_comb_income_v2 == "6"] = 6 # $35,000 through $49,999
+household.income[pdem02$demo_comb_income_v2 == "7"] = 7 # $50,000 through $74,999
+household.income[pdem02$demo_comb_income_v2 == "8"] = 8 # $75,000 through $99,999
+household.income[pdem02$demo_comb_income_v2 == "9"] = 9 # $100,000 through $199,999
+household.income[pdem02$demo_comb_income_v2 == "10"] = 10 # $200,000 and greater
+household.income[pdem02$demo_comb_income_v2 == "777"] = NA
+household.income[pdem02$demo_comb_income_v2 == "999"] = NA
+household.income[household.income %in% c(NA, "999", "777")] = NA
+pdem02$household.income = factor( household.income, levels= 1:10, 
+                                  labels = c("LT5K", "8.5K", "14K", "20.5K", "30K",
+                                             "42.5K", "62.5K", "87.5K", "150K", "200KP") )
+
+highest.education = rep("999", length(pdem02$demo_prnt_ed_v2b))
+highest.education[pdem02$demo_prnt_ed_v2 == "0"] = 1
+highest.education[pdem02$demo_prnt_ed_v2 == "1"] = 4
+highest.education[pdem02$demo_prnt_ed_v2 == "2"] = 5
+highest.education[pdem02$demo_prnt_ed_v2 == "3"] = 6
+highest.education[pdem02$demo_prnt_ed_v2 == "4"] = 7
+highest.education[pdem02$demo_prnt_ed_v2 == "5"] = 8
+highest.education[pdem02$demo_prnt_ed_v2 == "6"] = 9
+highest.education[pdem02$demo_prnt_ed_v2 == "7"] = 10
+highest.education[pdem02$demo_prnt_ed_v2 == "8"] = 11
+highest.education[pdem02$demo_prnt_ed_v2 == "9"] = 12
+highest.education[pdem02$demo_prnt_ed_v2 == "10"] = 13
+highest.education[pdem02$demo_prnt_ed_v2 == "11"] = 14
+highest.education[(pdem02$demo_prnt_ed_v2 == "12") | (pdem02$demo_prnt_ed_v2 == "13")] = 16
+highest.education[pdem02$demo_prnt_ed_v2 == "14"] = 17
+highest.education[pdem02$demo_prnt_ed_v2 == "15"] = 18
+highest.education[(pdem02$demo_prnt_ed_v2 == "16") | (pdem02$demo_prnt_ed_v2 == "17")] = 20
+highest.education[pdem02$demo_prnt_ed_v2 == "18"] = 21
+highest.education[pdem02$demo_prnt_ed_v2 == "19"] = 22
+highest.education[pdem02$demo_prnt_ed_v2 == "20"] = 23
+highest.education[pdem02$demo_prnt_ed_v2 == "21"] = 24
+highest.education[pdem02$demo_prnt_ed_v2 == "777"] = 999
+highest.education[highest.education == 999] = NA
+
+highest.education2 = rep("999", length(pdem02$demo_prtnr_ed_v2))
+highest.education2[pdem02$demo_prtnr_ed_v2 == "0"] = 1
+highest.education2[pdem02$demo_prtnr_ed_v2 == "1"] = 4
+highest.education2[pdem02$demo_prtnr_ed_v2 == "2"] = 5
+highest.education2[pdem02$demo_prtnr_ed_v2 == "3"] = 6
+highest.education2[pdem02$demo_prtnr_ed_v2 == "4"] = 7
+highest.education2[pdem02$demo_prtnr_ed_v2 == "5"] = 8
+highest.education2[pdem02$demo_prtnr_ed_v2 == "6"] = 9
+highest.education2[pdem02$demo_prtnr_ed_v2 == "7"] = 10
+highest.education2[pdem02$demo_prtnr_ed_v2 == "8"] = 11
+highest.education2[pdem02$demo_prtnr_ed_v2 == "9"] = 12
+highest.education2[pdem02$demo_prtnr_ed_v2 == "10"] = 13
+highest.education2[pdem02$demo_prtnr_ed_v2 == "11"] = 14
+highest.education2[(pdem02$demo_prtnr_ed_v2 == "12") | (pdem02$demo_prtnr_ed_v2 == "13")] = 16
+highest.education2[pdem02$demo_prtnr_ed_v2 == "14"] = 17
+highest.education2[pdem02$demo_prtnr_ed_v2 == "15"] = 18
+highest.education2[(pdem02$demo_prtnr_ed_v2 == "16") | (pdem02$demo_prtnr_ed_v2 == "17")] = 20
+highest.education2[pdem02$demo_prtnr_ed_v2 == "18"] = 21
+highest.education2[pdem02$demo_prtnr_ed_v2 == "19"] = 22
+highest.education2[pdem02$demo_prtnr_ed_v2 == "20"] = 23
+highest.education2[pdem02$demo_prtnr_ed_v2 == "21"] = 24
+highest.education2[pdem02$demo_prtnr_ed_v2 == "777"] = 999
+highest.education2[highest.education2 == 999] = NA
+pdem02$highest.education = factor( as.character(pmax(as.numeric(highest.education), as.numeric(highest.education2),na.rm=T)), levels=c(9,10,11,12,13,14,15,16,17,18,20,21,22,23,24), labels=c("9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "20", "21", "22", "23", "24") )
+
+high.educ1 = pdem02$demo_prnt_ed_v2
+high.educ2 = pdem02$demo_prtnr_ed_v2
+high.educ1[which(high.educ1 == "999")] = NA
+high.educ2[which(high.educ2 == "999")] = NA
+high.educ1[which(high.educ1 == "777")] = NA
+high.educ2[which(high.educ2 == "777")] = NA
+high.educ = pmax(as.numeric(as.character(high.educ1)), as.numeric(as.character(high.educ2)), na.rm=T)
+idx <- which(high.educ %in% 0:12, arr.ind = TRUE)
+high.educ[idx] = 1 # "< HS Diploma"
+idx <- which(high.educ %in% 13:14, arr.ind = TRUE)
+high.educ[idx] = 2 # "HS Diploma/GED"
+idx <- which(high.educ %in% 15:17, arr.ind = TRUE)
+high.educ[idx] = 3 # "Some College"
+idx <- which(high.educ == 18, arr.ind = TRUE)
+high.educ[idx] = 4 # "Bachelor"
+idx <- which(high.educ %in% 19:21, arr.ind = TRUE)
+high.educ[idx] = 5 # "Post Graduate Degree"
+high.educ[which(high.educ == "999")]=NA
+high.educ[which(high.educ == "777")]=NA
+pdem02$high.educ = factor( high.educ, levels= 1:5, labels = c("LTHSDiploma","HSDiplomaGED","SomeCollege","Bachelor","PostGradDegree") )
+
+pdem02_family <- pdem02 %>%
+  filter(src_subject_id %in% data.family[[1]])
+
+```
+
+## Income imputations for full sample
+```{r multipleimputationincome}
+if (!('data.table' %in% installed.packages()[,"Package"]))  install.packages('data.table')
+if (!('mice' %in% installed.packages()[,"Package"]))  install.packages('mice')
+library(data.table)
+library(mice)
+
+vars_for_imputation <- data.table(acspsw03$src_subject_id, acspsw03$interview_age, acspsw03$gender, acspsw03$race_ethnicity, pdem02$highest.education, pdem02$household.income, fluid_int$pea_wiscv_tss )
+dat_nms <-  c("src_subject_id", "age", "female", "race.ethnicity", "highest.education", "household.income", "pea_wiscv_tss")
+
+colnames(vars_for_imputation) <- dat_nms
+
+# Number of multiple imputed datasets & maximum number of iterations 
+n.imp = 5
+n.iter = 10
+
+var.ls <- c("src_subject_id", "age", "female", "race.ethnicity", "highest.education", "household.income", "pea_wiscv_tss")
+dat0 <- vars_for_imputation[, var.ls, with = FALSE ]
+dat0[, table(age, useNA = "if") ]
+dat0[, table(female, useNA = "if") ]
+dat0[, table(race.ethnicity, useNA = "if") ]
+dat0[, table(household.income, useNA = "if") ]
+dat0[, table(highest.education, useNA = "if") ]
+dat0[, table(pea_wiscv_tss, useNA = "if") ]
+
+ini <- mice( dat0, m = 1, maxit = 0 )
+meth = ini$meth
+
+meth["female"]     <- "logreg"
+meth["race.ethnicity"]   <- "polyreg"
+meth["household.income"]      <- "polyreg"
+meth["highest.education"]  <- "polyreg"
+meth["pea_wiscv_tss"]  <- "polyreg"
+
+
+pred = ini$pred
+
+# Excluding variables from the imputation models
+pred[, c("src_subject_id") ] <- 0
+pred
+
+# Specifying parameters for the imputation
+post <- mice( dat0, meth = meth, pred = pred, seed = 111,
+              m = 1, maxit = 0)$post
+
+dat.imp <- mice( dat0, meth = meth, pred = pred, post = post,
+                 seed = 1111,
+                 m = n.imp, maxit = n.iter)
+rm(dat0)
+
+# get one imputed dataset out
+completedData <- complete(dat.imp,1)
+pdem02$household.income <- completedData$household.income
+pdem02$highest.education <- as.numeric(paste(completedData$highest.education))
+
+household.income_num <- paste(pdem02$household.income)
+household.income_num[household.income_num == "LT5K"] = 5000 #  Less than $5,000
+household.income_num[household.income_num == "8.5K"] = 8500 # $5,000 through $11,999
+household.income_num[household.income_num == "14K"] = 14000 # $12,000 through $15,999
+household.income_num[household.income_num == "20.5K"] = 20500 # $16,000 through $24,999
+household.income_num[household.income_num == "30K"] = 30000 # $25,000 through $34,999
+household.income_num[household.income_num == "42.5K"] = 42500 # $35,000 through $49,999
+household.income_num[household.income_num == "62.5K"] = 62500 # $50,000 through $74,999
+household.income_num[household.income_num == "87.5K"] = 87500 # $75,000 through $99,999
+household.income_num[household.income_num == "150K"] = 150000 # $100,000 through $199,999
+household.income_num[household.income_num == "200KP"] = 200000 # $200,000 and greater
+pdem02$household.income_num <- as.numeric(household.income_num)
+
+rm(vars_for_imputation, household.income_num)
+```
+
+## Income Imputations for excluded family subset
+
+```{r}
+vars_for_imputation <- data.table(acspsw03_family$src_subject_id, acspsw03_family$interview_age, acspsw03_family$gender, acspsw03_family$race_ethnicity, pdem02_family$highest.education, pdem02_family$household.income )
+dat_nms <-  c("src_subject_id", "age", "female", "race.ethnicity", "highest.education", "household.income")
+
+colnames(vars_for_imputation) <- dat_nms
+
+# Number of multiple imputed datasets & maximum number of iterations 
+n.imp = 5
+n.iter = 10
+
+var.ls <- c("src_subject_id", "age", "female", "race.ethnicity", "highest.education", "household.income")
+dat0 <- vars_for_imputation[, var.ls, with = FALSE ]
+dat0[, table(age, useNA = "if") ]
+dat0[, table(female, useNA = "if") ]
+dat0[, table(race.ethnicity, useNA = "if") ]
+dat0[, table(household.income, useNA = "if") ]
+dat0[, table(highest.education, useNA = "if") ]
+
+ini <- mice( dat0, m = 1, maxit = 0 )
+meth = ini$meth
+
+meth["female"]     <- "logreg"
+meth["race.ethnicity"]   <- "polyreg"
+meth["household.income"]      <- "polyreg"
+meth["highest.education"]  <- "polyreg"
+
+pred = ini$pred
+
+# Excluding variables from the imputation models
+pred[, c("src_subject_id") ] <- 0
+pred
+
+# Specifying parameters for the imputation
+post <- mice( dat0, meth = meth, pred = pred, seed = 111,
+              m = 1, maxit = 0)$post
+
+dat.imp <- mice( dat0, meth = meth, pred = pred, post = post,
+                 seed = 1111,
+                 m = n.imp, maxit = n.iter)
+rm(dat0)
+
+# get one imputed dataset out
+completedData_family <- complete(dat.imp,1)
+pdem02_family$household.income <- completedData_family$household.income
+pdem02_family$highest.education <- as.numeric(paste(completedData_family$highest.education))
+
+household.income_num <- paste(pdem02_family$household.income)
+household.income_num[household.income_num == "LT5K"] = 5000 #  Less than $5,000
+household.income_num[household.income_num == "8.5K"] = 8500 # $5,000 through $11,999
+household.income_num[household.income_num == "14K"] = 14000 # $12,000 through $15,999
+household.income_num[household.income_num == "20.5K"] = 20500 # $16,000 through $24,999
+household.income_num[household.income_num == "30K"] = 30000 # $25,000 through $34,999
+household.income_num[household.income_num == "42.5K"] = 42500 # $35,000 through $49,999
+household.income_num[household.income_num == "62.5K"] = 62500 # $50,000 through $74,999
+household.income_num[household.income_num == "87.5K"] = 87500 # $75,000 through $99,999
+household.income_num[household.income_num == "150K"] = 150000 # $100,000 through $199,999
+household.income_num[household.income_num == "200KP"] = 200000 # $200,000 and greater
+pdem02_family$household.income_num <- as.numeric(household.income_num)
+
+```
+
+
+```{r SESVariablesIncluded}
+pdem02 <- pdem02 %>% 
+    select(src_subject_id,
+         highest.education,
+         household.income_num)
+
+# pdem02_family <- pdem02_family %>%
+#   select(src_subject_id, highest.education, household.income_num)
+
+```
+
+
+## Parent-reported Family Culture and Home Environment 
+The following section includes variables corresponding to family culture and family environment, as reported by parents. This includes the following measures: MACV, MEIM, Neighborhood Safety, Family Conflict, Prosocial Behavior.
+
+```{r ParentReportVars, echo=TRUE}
+
+sscep_n <-   sprintf('%s/abcd_sscep01.txt',data_dir) %>%
+  read_tsv(n_max = 0) %>% # default: col_names = TRUE
+  names()
+sscep  <- sprintf('%s/abcd_sscep01.txt',data_dir) %>% 
+  read_tsv(skip = 2, col_names = sscep_n, na = c('','NA','999','777'), guess_max = 11000) %>%
+  filter(eventname=="baseline_year_1_arm_1") %>%
+  select(src_subject_id, #id
+         meim_p_ss_exp,#meim exploration subscale
+         meim_p_ss_com, # meim commitment & attachment subscale 
+         nsc_p_ss_mean_3_items, #neighborhood safety mean
+         fes_p_ss_fc_pr, #family environment scale: conflict (prorated based on num answered)
+         macv_p_ss_fo, #Mexican Acculturation Values: family obligation
+         macv_p_ss_fr, #Mexican Acculturation Values: family as referent
+         macv_p_ss_fs, #Mexican Acculturation Values: family support
+         macv_p_ss_isr, #Mexican Acculturation Values: ind. & self-reliance
+         macv_p_ss_r #Mexican Acculturation Values: religion
+         )
+
+sscep_family <- sscep %>%
+  filter(src_subject_id %in% data.family[[1]])
+```
+## Youth-reported School/Family Social Environment 
+The following section includes variables corresponding to  family/school social environment, as reported by youth. This includes the following measures: School and Protective Factors Survey, Parental Monitoring, Family Conflict, Prosocial Behavior, Caregiver Acceptance, and Neighborhood Safety.
+
+```{r YouthReportVars,echo=TRUE}
+
+sscey_n <-   sprintf('%s/abcd_sscey01.txt',data_dir) %>%
+  read_tsv(n_max = 0) %>% # default: col_names = TRUE
+  names()
+sscey  <- sprintf('%s/abcd_sscey01.txt',data_dir) %>% 
+  read_tsv(skip = 2, col_names = sscey_n, na = c('','NA','999','777'), guess_max = 11000) %>%
+  filter(eventname=="baseline_year_1_arm_1") %>%
+  select(src_subject_id, #id
+         srpf_y_ss_ses, #school youth & protective factors: environment
+         srpf_y_ss_iiss, #school youth & protective factors: involvement
+         srpf_y_ss_dfs, #disengagement from school
+         pmq_y_ss_mean, #parental monitoring sum score
+         fes_y_ss_fc_pr, #family environment scale: conflict (prorated based on num answered)
+         crpbi_y_ss_parent #acceptance subscale of parent completing survey 
+  )
+
+abcd_nsc01_n <-   sprintf('%s/abcd_nsc01.txt',data_dir) %>%
+  read_tsv(n_max = 0) %>% # default: col_names = TRUE
+  names()
+abcd_nsc01  <- sprintf('%s/abcd_nsc01.txt',data_dir) %>% 
+  read_tsv(skip = 2, col_names = abcd_nsc01_n, na = c('','NA','999','777'), guess_max = 11000) %>%
+  filter(eventname=="baseline_year_1_arm_1") %>%
+  select(src_subject_id, neighborhood_crime_y)
+
+sscey_family <- sscey %>%
+  filter(src_subject_id %in% data.family[[1]])
+
+abcd_nsc01_family <- abcd_nsc01 %>%
+  filter(src_subject_id %in% data.family[[1]])
+
+```
+
+
+## Residential Environment
+
+The following measures are derived based on reported addresses. These measures include the Area Deprivation Index, Walkibility Score, Population Density, NO2 and PM25 exposure, Proximity to Roads, and Reported Crimes.
+
+```{r ResidentialVars}
+
+
+rhds01_n <-   sprintf('%s/abcd_rhds01.txt',data_dir) %>%
+  read_tsv(n_max = 0) %>% # default: col_names = TRUE
+  names()
+rhds01 <- sprintf('%s/abcd_rhds01.txt',data_dir) %>% 
+  read_tsv(skip = 2, col_names = rhds01_n, na = c('','NA','999','777'), guess_max = 11875) %>%
+  filter(eventname=="baseline_year_1_arm_1") 
+
+# log transforming the following variables because they are heavily skewed.
+# log1p accounts for 0 values by approximating zeros as a very very small number
+rhds01$Res_density_log <- log1p(rhds01$reshist_addr1_d1a) #residential density
+
+rhds01$UCR_GrandTotal_log <- log1p(rhds01$reshist_addr1_grndtot) # grandtotal crime
+rhds01$UCR_TotOffenses_log <- log1p(rhds01$reshist_addr1_p1tot) # total adult offenses
+rhds01$UCR_ViolCrime_log <- log1p(rhds01$reshist_addr1_p1vlnt) # total adult violent crime
+rhds01$UCR_DrugAbuse_log <- log1p(rhds01$reshist_addr1_drugtot) # drug abuse violations
+rhds01$UCR_DrugSale_log <- log1p(rhds01$reshist_addr1_drgsale) #drug sale total
+rhds01$UCR_DrugPoss_log <- log1p(rhds01$reshist_addr1_drgposs) # drug possession
+rhds01$UCR_DUI_log <- log1p(rhds01$reshist_addr1_dui) # dui reports
+rhds01$UCR_MJSale_log <- log1p(rhds01$reshist_addr1_mjsale) # marijuana sales
+
+rhds01$ProxRoads_log <- log(rhds01$reshist_addr1_proxrd) # proximity to roads
+
+rhds01$reshist_addr1_adi_ncar_log <- log1p(rhds01$reshist_addr1_adi_ncar)
+rhds01$reshist_addr1_adi_ntel_log <- log1p(rhds01$reshist_addr1_adi_ntel)
+rhds01$reshist_addr1_adi_nplumb_log <- log1p(rhds01$reshist_addr1_adi_nplumb)
+rhds01$reshist_addr1_adi_crowd_log <- log1p(rhds01$reshist_addr1_adi_crowd)
+
+  
+```
+
+
+```{r ResidentialVariablesIncluded, echo=TRUE}
+rhds01 <- rhds01 %>%
+  select(src_subject_id, #id
+         reshist_addr1_adi_perc, #area deprivation index
+         reshist_addr1_walkindex, # walkability index
+         reshist_addr1_no2, # NO2 levels
+         reshist_addr1_pm25, #PM2.5 levels
+         ProxRoads_log, # Proximity to roads
+         Res_density_log, # residential density
+         UCR_GrandTotal_log, UCR_TotOffenses_log, UCR_ViolCrime_log, #crime vars
+         UCR_DrugAbuse_log, UCR_DrugSale_log, UCR_DrugPoss_log, UCR_DUI_log, UCR_MJSale_log,
+         reshist_addr1_adi_edu_l,
+         reshist_addr1_adi_edu_h,
+         reshist_addr1_adi_work_c,
+         reshist_addr1_adi_income,
+         reshist_addr1_adi_in_dis,
+         reshist_addr1_adi_home_v,
+         reshist_addr1_adi_rent,
+         reshist_addr1_adi_mortg,
+         reshist_addr1_adi_home_o,
+         reshist_addr1_adi_unemp,
+         reshist_addr1_adi_pov,
+         reshist_addr1_adi_b138,
+         reshist_addr1_adi_sp,
+         reshist_addr1_adi_ncar_log,
+         reshist_addr1_adi_ntel_log, 
+         reshist_addr1_adi_nplumb_log, 
+         reshist_addr1_adi_crowd_log
+) 
+
+rhds01_family <- rhds01 %>%
+  filter(src_subject_id %in% data.family[[1]])
+```
+
+
+## List Sorting Cognitive Scores
+
+Relevant to PLS model 1, we will be using the List Sorting uncorrected score from the NIH Cognition Toolbox. 
+```{r ListSortingScore, echo=FALSE}
+abcd_tbss01_n <-   sprintf('%s/abcd_tbss01.txt',data_dir) %>%
+  read_tsv(n_max = 0) %>% # default: col_names = TRUE
+  names()
+abcd_tbss01 <- sprintf('%s/abcd_tbss01.txt',data_dir) %>% 
+  read_tsv(skip = 2, col_names = abcd_tbss01_n, 
+           na = c('','NA'), guess_max = 11875) %>% 
+  filter(eventname=="baseline_year_1_arm_1") %>% 
+  select(src_subject_id,
+         nihtbx_list_uncorrected)
+
+abcd_tbss01_family <- abcd_tbss01 %>%
+  filter(src_subject_id %in% data.family[[1]])
+
+```
+
+
+## Other Cognitive Scores 
+
+```{r}
+
+other_cog_scores <- read_csv("/Users/wesleymeredith/Documents/data/0_data_output/release_2.0/data.crop.update.csv") %>%
+  select(c(2,14:29))
+
+colnames(other_cog_scores)[1] <- "src_subject_id"
+
+allwmn_wisc_scores <- other_cog_scores %>%
+  select(src_subject_id, tfmri_nb_all_beh_c2b_rate, tfmri_nb_all_beh_c0b_rate, pea_wiscv_tss)
+
+
+```
+
+
+
+## Merging it all together
+
+In this section we merge all of the variables together
+
+```{r mergevariables, echo=TRUE}
+
+all_measures  = list(acspsw03, pdem02, sscep, sscey, abcd_nsc01, rhds01, abcd_tbss01, other_cog_scores)
+
+compcase1 <- acspsw03[complete.cases(acspsw03),] #11854
+compcase2 <- pdem02[complete.cases(pdem02),] #11875
+compcase3 <- sscep[complete.cases(sscep),] #11178
+compcase4 <- sscey[complete.cases(sscey),] #11834 
+compcase5 <- abcd_nsc01[complete.cases(abcd_nsc01),] #11849
+compcase6 <- rhds01[complete.cases(rhds01),] #11155
+compcase7 <- abcd_tbss01[complete.cases(abcd_tbss01),] #11669
+compcase8 <- other_cog_scores[complete.cases(other_cog_scores),]
+
+combined_measures <- Reduce(function(dtf1, dtf2) merge(dtf1, dtf2, all.x = TRUE),
+                            all_measures)
+
+combined_measures_complete <- combined_measures[complete.cases(combined_measures),]  #9537 
+
+# combined_meas_wisc <- combined_measures_complete %>%
+#   mutate(wisc_mat = outcome_vars$pea_wiscv_tss)
+# 
+ final_subjectlist_allcog <- combined_measures_complete %>%
+   select(src_subject_id)
+# 
+# 
+ write.csv(final_subjectlist_allcog, sprintf('%s/final_subjectlist_allcog.csv', data_dir_subs), row.names = FALSE)
+ 
+ #write.csv(final_subjectlist_allcog, sprintf('%s/final_subjectlist_allwm_wisc.csv', data_dir_subs), row.names = FALSE)
+ 
+```
+
+## Merging all the variables together for the family excluded subset
+
+```{r mergevars_reducedfam}
+
+all_measures_family  = list(acspsw03_family, pdem02_family, sscep_family, sscey_family, 
+                            abcd_nsc01_family, rhds01_family, abcd_tbss01_family)
+
+compcase1_family <- acspsw03_family[complete.cases(acspsw03_family),] #9967
+compcase2_family <- pdem02_family[complete.cases(pdem02_family),] #9987
+compcase3_family <- sscep_family[complete.cases(sscep_family),] #9398
+compcase4_family <- sscey_family[complete.cases(sscey_family),] #9949
+compcase5_family <- abcd_nsc01_family[complete.cases(abcd_nsc01_family),] #9963
+compcase6_family <- rhds01_family[complete.cases(rhds01_family),] #9443
+compcase7_family <- abcd_tbss01_family[complete.cases(abcd_tbss01_family),] #9813
+
+combined_measures_family <- Reduce(function(dtf1, dtf2) merge(dtf1, dtf2, all.x = TRUE),
+                            all_measures_family)
+combined_measures_complete_family <- combined_measures_family[complete.cases(combined_measures_family),] #8045 
+
+```
+
+
+
+##For the overall dataset, we will compute the PCA for the Crime variables, and the MACV variables
+```{r CrimePCA, echo=TRUE,results = 'markdown'}
+UCRCrime <- combined_measures_complete[c("UCR_GrandTotal_log", "UCR_TotOffenses_log", "UCR_ViolCrime_log", 
+                       "UCR_DrugAbuse_log", "UCR_DrugSale_log", "UCR_DrugPoss_log", "UCR_DUI_log",
+                       "UCR_MJSale_log")]
+
+res.pca_UCR <- PCA(UCRCrime, scale.unit = TRUE, graph = T) #first PC is 96.8%
+fviz_screeplot(res.pca_UCR, addlabels =TRUE)
+fviz_pca_var(res.pca_UCR, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE # Avoid text overlapping
+)
+fviz_contrib(res.pca_UCR, choice = "var", axes = 1, top = 20)
+
+combined_measures_complete$Crime_PC <- res.pca_UCR$ind$coord[,1]
+```
+
+
+## compute the Crime PCA for reduced family subset
+
+```{r CrimePCA_ReducedFam, echo=TRUE,results = 'markdown'}
+
+UCRCrime_family <- combined_measures_complete_family[c("UCR_GrandTotal_log", "UCR_TotOffenses_log", "UCR_ViolCrime_log", 
+                       "UCR_DrugAbuse_log", "UCR_DrugSale_log", "UCR_DrugPoss_log", "UCR_DUI_log",
+                       "UCR_MJSale_log")]
+
+res.pca_UCR_family <- PCA(UCRCrime_family, scale.unit = TRUE, graph = T) #first PC is 97.1%
+fviz_screeplot(res.pca_UCR_family, addlabels =TRUE)
+fviz_pca_var(res.pca_UCR_family, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE # Avoid text overlapping
+)
+fviz_contrib(res.pca_UCR_family, choice = "var", axes = 1, top = 20)
+
+combined_measures_complete_family$Crime_PC <- res.pca_UCR_family$ind$coord[,1]
+
+```
+
+
+```{r fullcompletecases}
+Comb_meas_vars<- combined_measures_complete %>%
+  select(interview_age,#demographics
+         gender_M,
+         race_ethnicity_white,
+         race_ethnicity_black,
+         race_ethnicity_hispanic, 
+         race_ethnicity_asian,
+         race_ethnicity_other,
+         household.income_num,#SES
+         highest.education,
+         meim_p_ss_exp,
+         meim_p_ss_com,
+         macv_p_ss_fo,
+         macv_p_ss_fr,
+         macv_p_ss_fs,           
+         macv_p_ss_isr,           
+         macv_p_ss_r,
+         fes_p_ss_fc_pr, #home env
+         pmq_y_ss_mean,
+         fes_y_ss_fc_pr,
+         crpbi_y_ss_parent,
+         srpf_y_ss_ses,#school env
+         srpf_y_ss_iiss,
+         srpf_y_ss_dfs,
+         nsc_p_ss_mean_3_items, #neighborhood
+         neighborhood_crime_y,
+         reshist_addr1_walkindex,
+         reshist_addr1_no2,
+         reshist_addr1_pm25,
+         ProxRoads_log,
+         Res_density_log,
+         Crime_PC,
+         reshist_addr1_adi_edu_l,
+         reshist_addr1_adi_edu_h,
+         reshist_addr1_adi_work_c,
+         reshist_addr1_adi_income,
+         reshist_addr1_adi_in_dis,
+         reshist_addr1_adi_home_v,
+         reshist_addr1_adi_rent,
+         reshist_addr1_adi_mortg,
+         reshist_addr1_adi_home_o,
+         reshist_addr1_adi_unemp,
+         reshist_addr1_adi_pov,
+         reshist_addr1_adi_b138,
+         reshist_addr1_adi_sp,
+         reshist_addr1_adi_ncar_log,
+         reshist_addr1_adi_ntel_log, 
+         reshist_addr1_adi_nplumb_log, 
+         reshist_addr1_adi_crowd_log,
+         nihtbx_list_uncorrected,
+         nihtbx_picvocab_uncorrected,
+         nihtbx_flanker_uncorrected,
+         nihtbx_cardsort_uncorrected,
+         nihtbx_pattern_uncorrected,
+         nihtbx_picture_uncorrected,
+         nihtbx_reading_uncorrected,
+         pea_wiscv_tss,
+         pea_ravlt_sd_trial_vi_tc,
+         pea_ravlt_ld_trial_vii_tc,
+         lmt_scr_efficiency,
+         cash_choice_task,
+         tfmri_nb_all_beh_c0b_rate,
+         tfmri_nb_all_beh_c2b_rate,
+         overall_dprime,
+         tfmri_sst_all_beh_total_meanrt,
+         mean_earnings  )
+
+colnames(Comb_meas_vars) <- c("Age",
+"Male",
+"White",
+"Black",
+"Hispanic",
+"Asian",
+"Other",
+"Income",
+"Education",
+"EthIdentExploration",
+"EthIdentCommitment",
+"FamObligation",
+"FamReferent",
+"FamSupport",
+"IndepSelfReliance",
+"Religion",
+"FamConflict_P",
+"ParentMonitoring",
+"FamConflict_Y",
+"ParentAcceptance",
+"SchoolEnvironment",
+"SchoolInvolvement",
+"SchoolDisengagement",
+"NeighSafety_P",
+"NeighSafety_Y",
+"Walkability",
+"NO2Exposure",
+"PM25Exposure",
+"ProxRoads",
+"ResDensity",
+"CrimePC",
+"ADI_Edu_LTHS",
+"ADI_Edu_HSDip",
+"ADI_Occ_WhiteCollar",
+"ADI_MedianFamInc",
+"ADI_IncDisparityIdx",
+"ADI_MedianHomeValue",
+"ADI_MedianGrossRent",
+"ADI_MedianMonthMortg",
+"ADI_PercHOwner",
+"ADI_PercUnemp",
+"ADI_PercFamPoverty",
+"ADI_PercPovBelow128",
+"ADI_PercSingle",
+"ADI_PercLogNCar",
+"ADI_PercLogNTel",
+"ADI_PercLogNPlumb",
+"ADI_PercCrowding",
+"NIH_ListSorting_Scores",
+"NIH_PicVocab",
+"NIH_Flanker",
+"NIH_CardSort",
+"NIH_PatternComp",
+"NIH_PicSeqMem",
+"NIH_Reading",
+"WISC_Matrix",
+"RAVLT_ShortDel",
+"RAVLT_LongDel",
+"LittleMan",
+"CashChoice",
+"Neuro_0back",
+"Neuro_2back",
+"Neuro_EmoRec",
+"Neuro_StopSig",
+"Neuro_MID")
+
+write.csv(Comb_meas_vars, sprintf('%s/ABCD_EnvVars_allcog.csv',data_dir_subs), row.names = FALSE)
+
+
+```
+
+
+
+## gather varibles for the reduced family data set
+```{r}
+Comb_meas_vars_family<- combined_measures_complete_family %>%
+  select(interview_age,#demographics
+         gender_M,
+         race_ethnicity_white,
+         race_ethnicity_black,
+         race_ethnicity_hispanic, 
+         race_ethnicity_asian,
+         race_ethnicity_other,
+         household.income_num,#SES
+         highest.education,
+         meim_p_ss_exp,
+         meim_p_ss_com,
+         macv_p_ss_fo,
+         macv_p_ss_fr,
+         macv_p_ss_fs,           
+         macv_p_ss_isr,           
+         macv_p_ss_r,
+         fes_p_ss_fc_pr, #home env
+         pmq_y_ss_mean,
+         fes_y_ss_fc_pr,
+         crpbi_y_ss_parent,
+         srpf_y_ss_ses,#school env
+         srpf_y_ss_iiss,
+         srpf_y_ss_dfs,
+         nsc_p_ss_mean_3_items, #neighborhood
+         neighborhood_crime_y,
+         reshist_addr1_walkindex,
+         reshist_addr1_no2,
+         reshist_addr1_pm25,
+         ProxRoads_log,
+         Res_density_log,
+         Crime_PC,
+         reshist_addr1_adi_edu_l,
+         reshist_addr1_adi_edu_h,
+         reshist_addr1_adi_work_c,
+         reshist_addr1_adi_income,
+         reshist_addr1_adi_in_dis,
+         reshist_addr1_adi_home_v,
+         reshist_addr1_adi_rent,
+         reshist_addr1_adi_mortg,
+         reshist_addr1_adi_home_o,
+         reshist_addr1_adi_unemp,
+         reshist_addr1_adi_pov,
+         reshist_addr1_adi_b138,
+         reshist_addr1_adi_sp,
+         reshist_addr1_adi_ncar_log,
+         reshist_addr1_adi_ntel_log, 
+         reshist_addr1_adi_nplumb_log, 
+         reshist_addr1_adi_crowd_log,
+         nihtbx_list_uncorrected)
+
+colnames(Comb_meas_vars_family) <- c("Age",
+"Male",
+"White",
+"Black",
+"Hispanic",
+"Asian",
+"Other",
+"Income",
+"Education",
+"EthIdentExploration",
+"EthIdentCommitment",
+"FamObligation",
+"FamReferent",
+"FamSupport",
+"IndepSelfReliance",
+"Religion",
+"FamConflict_P",
+"ParentMonitoring",
+"FamConflict_Y",
+"ParentAcceptance",
+"SchoolEnvironment",
+"SchoolInvolvement",
+"SchoolDisengagement",
+"NeighSafety_P",
+"NeighSafety_Y",
+"Walkability",
+"NO2Exposure",
+"PM25Exposure",
+"ProxRoads",
+"ResDensity",
+"CrimePC",
+"ADI_Edu_LTHS",
+"ADI_Edu_HSDip",
+"ADI_Occ_WhiteCollar",
+"ADI_MedianFamInc",
+"ADI_IncDisparityIdx",
+"ADI_MedianHomeValue",
+"ADI_MedianGrossRent",
+"ADI_MedianMonthMortg",
+"ADI_PercHOwner",
+"ADI_PercUnemp",
+"ADI_PercFamPoverty",
+"ADI_PercPovBelow128",
+"ADI_PercSingle",
+"ADI_PercLogNCar",
+"ADI_PercLogNTel",
+"ADI_PercLogNPlumb",
+"ADI_PercCrowding",
+"Cog_ListSorting_Scores")
+
+write.csv(Comb_meas_vars_family, sprintf('%s/ABCD_ReducedFam_EnvVars_V4.csv',data_dir_subs), row.names = FALSE)
+```
+## Regress out sociodemographic variables from set with all cog scores
+
+```{r manyLMs}
+
+X <- as.matrix(Comb_meas_vars[c("Age",
+                                "Male",
+"White",
+"Black",
+"Hispanic",
+"Asian",
+"Income",
+"Education")])
+
+Y <- as.matrix(Comb_meas_vars[c("EthIdentExploration",
+"EthIdentCommitment",
+"FamObligation",
+"FamReferent",
+"FamSupport",
+"IndepSelfReliance",
+"Religion",
+"FamConflict_P",
+"ParentMonitoring",
+"FamConflict_Y",
+"ParentAcceptance",
+"SchoolEnvironment",
+"SchoolInvolvement",
+"SchoolDisengagement",
+"NeighSafety_P",
+"NeighSafety_Y",
+"Walkability",
+"NO2Exposure",
+"PM25Exposure",
+"ProxRoads",
+"ResDensity",
+"CrimePC",
+"ADI_Edu_LTHS",
+"ADI_Edu_HSDip",
+"ADI_Occ_WhiteCollar",
+"ADI_MedianFamInc",
+"ADI_IncDisparityIdx",
+"ADI_MedianHomeValue",
+"ADI_MedianGrossRent",
+"ADI_MedianMonthMortg",
+"ADI_PercHOwner",
+"ADI_PercUnemp",
+"ADI_PercFamPoverty",
+"ADI_PercPovBelow128",
+"ADI_PercSingle",
+"ADI_PercLogNCar",
+"ADI_PercLogNTel",
+"ADI_PercLogNPlumb",
+"ADI_PercCrowding",
+"NIH_ListSorting_Scores",
+"NIH_PicVocab",
+"NIH_Flanker",
+"NIH_CardSort",
+"NIH_PatternComp",
+"NIH_PicSeqMem",
+"NIH_Reading",
+"WISC_Matrix",
+"RAVLT_ShortDel",
+"RAVLT_LongDel",
+"LittleMan",
+"CashChoice",
+"Neuro_0back",
+"Neuro_2back",
+"Neuro_EmoRec",
+"Neuro_StopSig",
+"Neuro_MID")])
+
+lm.ControlDem <- lm(Y ~ X, data = Comb_meas_vars)
+CombMeasures_allcog_resid <- lm.ControlDem$residuals
+
+Regress_AllCog <-  data.frame(Comb_meas_vars[c("Age","Male",
+"White",
+"Black",
+"Hispanic",
+"Asian",
+"Income",
+"Education")],CombMeasures_allcog_resid[,c("NIH_ListSorting_Scores",
+"NIH_PicVocab",
+"NIH_Flanker",
+"NIH_CardSort",
+"NIH_PatternComp",
+"NIH_PicSeqMem",
+"NIH_Reading",
+"WISC_Matrix",
+"RAVLT_ShortDel",
+"RAVLT_LongDel",
+"LittleMan",
+"CashChoice",
+"Neuro_0back",
+"Neuro_2back",
+"Neuro_EmoRec",
+"Neuro_StopSig",
+"Neuro_MID")])
+
+
+write.csv(CombMeasures_allcog_resid, sprintf('%s/ABCD_Full_EnvVars_allcog_residuals.csv', data_dir_subs), row.names = FALSE)
+
+
+```
+
+
+Regress out dem vars from set including fluid int
+
+
+
+
+## Regress out demographic vars from reduced family subset
+
+```{r}
+X <- as.matrix(Comb_meas_vars_family[c("Age",
+                                "Male",
+"White",
+"Black",
+"Hispanic",
+"Asian",
+"Income",
+"Education")])
+
+Y <- as.matrix(Comb_meas_vars_family[c("EthIdentExploration",
+"EthIdentCommitment",
+"FamObligation",
+"FamReferent",
+"FamSupport",
+"IndepSelfReliance",
+"Religion",
+"FamConflict_P",
+"ParentMonitoring",
+"FamConflict_Y",
+"ParentAcceptance",
+"SchoolEnvironment",
+"SchoolInvolvement",
+"SchoolDisengagement",
+"NeighSafety_P",
+"NeighSafety_Y",
+"Walkability",
+"NO2Exposure",
+"PM25Exposure",
+"ProxRoads",
+"ResDensity",
+"CrimePC",
+"ADI_Edu_LTHS",
+"ADI_Edu_HSDip",
+"ADI_Occ_WhiteCollar",
+"ADI_MedianFamInc",
+"ADI_IncDisparityIdx",
+"ADI_MedianHomeValue",
+"ADI_MedianGrossRent",
+"ADI_MedianMonthMortg",
+"ADI_PercHOwner",
+"ADI_PercUnemp",
+"ADI_PercFamPoverty",
+"ADI_PercPovBelow128",
+"ADI_PercSingle",
+"ADI_PercLogNCar",
+"ADI_PercLogNTel",
+"ADI_PercLogNPlumb",
+"ADI_PercCrowding",
+"Cog_ListSorting_Scores")])
+
+lm.ControlDem_ReducedFam <- lm(Y ~ X, data = Comb_meas_vars_family)
+CombMeasures_family_resid <- lm.ControlDem_ReducedFam$residuals
+
+Regress_Cog_Family <-  data.frame(Comb_meas_vars_family[c("Age","Male",
+"White",
+"Black",
+"Hispanic",
+"Asian",
+"Income",
+"Education")],CombMeasures_family_resid[,"Cog_ListSorting_Scores"])
+
+write.csv(CombMeasures_family_resid, sprintf('%s/ABCD_ReducedFam_EnvVars_V4_residuals.csv',data_dir_subs), row.names = FALSE)
+write.csv(Regress_Cog_Family, sprintf('%s/ABCD_Demographics_CogResid_ReducedFam.csv',data_dir_subs), row.names = FALSE)
+
+```
+
+```{r CreateBuckets}
+
+CultureVars <- CombMeasures_resid[,c("EthIdentExploration",
+                                     "EthIdentCommitment",
+"FamObligation",
+"FamReferent",
+"FamSupport",
+"IndepSelfReliance",
+"Religion")]
+
+HomeEnvVars <- CombMeasures_resid[,c("FamConflict_P",
+"ParentMonitoring",
+"FamConflict_Y",
+"ParentAcceptance")]
+
+SchoolEnvVars <- CombMeasures_resid[,c("SchoolEnvironment",
+"SchoolInvolvement",
+"SchoolDisengagement")]
+
+NeighborhoodEnvVars <- CombMeasures_resid[,c("NeighSafety_P",
+"NeighSafety_Y",
+"Walkability",
+"NO2Exposure",
+"PM25Exposure",
+"ProxRoads",
+"ResDensity",
+"CrimePC",
+"ADI_Edu_LTHS",
+"ADI_Edu_HSDip",
+"ADI_Occ_WhiteCollar",
+"ADI_MedianFamInc",
+"ADI_IncDisparityIdx",
+"ADI_MedianHomeValue",
+"ADI_MedianGrossRent",
+"ADI_MedianMonthMortg",
+"ADI_PercHOwner",
+"ADI_PercUnemp",
+"ADI_PercFamPoverty",
+"ADI_PercPovBelow128",
+"ADI_PercSingle",
+"ADI_PercLogNCar",
+"ADI_PercLogNTel",
+"ADI_PercLogNPlumb",
+"ADI_PercCrowding")]
+
+
+
+PCA_All = c()
+```
+
+## create buckets for the reduced family subset
+
+```{r CreateBucketsReducedFam}
+
+CultureVars_Family <- CombMeasures_family_resid[,c("EthIdentExploration",
+                                     "EthIdentCommitment",
+"FamObligation",
+"FamReferent",
+"FamSupport",
+"IndepSelfReliance",
+"Religion")]
+
+HomeEnvVars_Family <- CombMeasures_family_resid[,c("FamConflict_P",
+"ParentMonitoring",
+"FamConflict_Y",
+"ParentAcceptance")]
+
+SchoolEnvVars_Family <- CombMeasures_family_resid[,c("SchoolEnvironment",
+"SchoolInvolvement",
+"SchoolDisengagement")]
+
+NeighborhoodEnvVars_Family <- CombMeasures_family_resid[,c("NeighSafety_P",
+"NeighSafety_Y",
+"Walkability",
+"NO2Exposure",
+"PM25Exposure",
+"ProxRoads",
+"ResDensity",
+"CrimePC",
+"ADI_Edu_LTHS",
+"ADI_Edu_HSDip",
+"ADI_Occ_WhiteCollar",
+"ADI_MedianFamInc",
+"ADI_IncDisparityIdx",
+"ADI_MedianHomeValue",
+"ADI_MedianGrossRent",
+"ADI_MedianMonthMortg",
+"ADI_PercHOwner",
+"ADI_PercUnemp",
+"ADI_PercFamPoverty",
+"ADI_PercPovBelow128",
+"ADI_PercSingle",
+"ADI_PercLogNCar",
+"ADI_PercLogNTel",
+"ADI_PercLogNPlumb",
+"ADI_PercCrowding")]
+
+PCA_Family = c()
+
+```
+
+Creating variable list and environment type data table
+
+```{r}
+
+CultureVar_list <- data.table(c("EthIdentExploration",
+                 "EthIdentCommitment",
+                 "FamObligation",
+                 "FamReferent",
+                 "FamSupport",
+                 "IndepSelfReliance",
+                 "Religion"), "Culture")
+
+HomeEnvVar_list <- data.table(c("FamConflict_P",
+                 "ParentMonitoring",
+                 "FamConflict_Y",
+                 "ParentAcceptance"), "Home")
+
+SchoolEnvVar_list <- data.table(c("SchoolEnvironment",
+                   "SchoolInvolvement",
+                   "SchoolDisengagement"), "School")
+
+NeighborhoodEnvVar_list <- data.table(c("NeighSafety_P",
+                         "NeighSafety_Y",
+                         "Walkability",
+                         "NO2Exposure",
+                         "PM25Exposure",
+                         "ProxRoads",
+                         "ResDensity",
+                         "CrimePC",
+                         "ADI_Edu_LTHS",
+                         "ADI_Edu_HSDip",
+                         "ADI_Occ_WhiteCollar",
+                         "ADI_MedianFamInc",
+                         "ADI_IncDisparityIdx",
+                         "ADI_MedianHomeValue",
+                         "ADI_MedianGrossRent",
+                         "ADI_MedianMonthMortg",
+                         "ADI_PercHOwner",
+                         "ADI_PercUnemp",
+                         "ADI_PercFamPoverty",
+                         "ADI_PercPovBelow128",
+                         "ADI_PercSingle",
+                         "ADI_PercLogNCar",
+                         "ADI_PercLogNTel",
+                         "ADI_PercLogNPlumb",
+                         "ADI_PercCrowding"), "Neighborhood")
+
+combined_envirovar_list <- rbind(CultureVar_list, HomeEnvVar_list, SchoolEnvVar_list, NeighborhoodEnvVar_list)
+
+colnames(combined_envirovar_list) <- c("Variable", "Category")
+
+write_csv(combined_envirovar_list, sprintf('%s/ABCD_EnvVars_combinedlist.csv',data_dir_subs))
+
+```
+
+
+
+
+```{r ReconcileNDAandDEAPNames}
+
+subs_og <- combined_measures_complete$src_subject_id
+subs_alternate <- gsub("NDAR_", "sub-NDAR",subs_og)
+subs_all <- data.table(subs_orig = subs_og, subs_alt = subs_alternate) ## final number participants = 10288
+
+subs_all_family <- subs_all %>%
+  filter(subs_orig %in% data.family[[1]]) ## final number participants = 8701
+
+write.csv(subs_all, sprintf('%s/subs_EnvVars_updated.csv', data_dir_subs), row.names = FALSE)
+write.csv(subs_all_family, sprintf('%s/subs_EnvVars_Family_updated.csv', data_dir_subs), row.names = FALSE)
+
+```
+
+```{r PCA All}
+res.pca_Combined <- PCA(CombMeasures_resid[,c(1:39)], scale.unit = TRUE, graph = T) #first PC is 96.29%
+fviz_screeplot(res.pca_Combined, addlabels =TRUE)
+fviz_pca_var(res.pca_Combined, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE # Avoid text overlapping
+)
+fviz_contrib(res.pca_Combined, choice = "var", axes = 1, top = 40)
+
+fviz_contrib(res.pca_Combined, choice = "var", axes = 2, top = 40)
+
+summary(res.pca_Combined)
+```
+```{r PCA_ALL_Family}
+
+res.pca_Combined_Family <- PCA(CombMeasures_family_resid[,c(1:39)], scale.unit = TRUE, graph = T) #first PC is 96.29%
+fviz_screeplot(res.pca_Combined_Family, addlabels =TRUE)
+fviz_pca_var(res.pca_Combined_Family, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE # Avoid text overlapping
+)
+fviz_contrib(res.pca_Combined_Family, choice = "var", axes = 1, top = 20)
+
+
+```
+
+
+
+```{r heatmap}
+#install.packages("heatmaply")
+
+library(heatmaply)
+my_cor <- cor(CombMeasures_resid)
+heatmaply_cor(my_cor)
+
+my_cor_family <- cor(CombMeasures_family_resid)
+heatmaply(my_cor_family)
+```
+
+
+
+

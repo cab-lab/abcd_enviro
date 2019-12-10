@@ -1,0 +1,334 @@
+---
+title: "ABCD_EnvVars_SEM"
+author: "Wesley Meredith"
+date: "11/26/2019"
+output: pdf_document
+---
+
+```{r global_options, include = FALSE}
+
+knitr::opts_chunk$set(message=FALSE, 
+tidy.opts=list(width.cutoff=40), tidy = TRUE) 
+
+```
+
+```{r packages, include=FALSE, message=FALSE}
+
+library(tidyverse)
+library(lavaan)
+library(semPlot)
+
+data_dir_subs <- "/Users/wesleymeredith/Documents/data/0_data_output/enviro_factors/enviro_output/"
+
+```
+
+QUICK NOTE: I still need to implement the exploratory/confirmatory split in the data that we mentioned in the last meeting. These models are currently using all participants; will need to apply the site split
+
+## Import z-scored environmental variables and "sociodemographic indicators
+
+```{r import_data}
+
+sem_cogdata <- read_csv(paste(data_dir_subs, 'allcogvars_zscore.csv', sep = ''))
+
+sem_sociodem_vars <- colnames(sem_cogdata)[1:8]
+
+sem_enviro_vars <- colnames(sem_cogdata)[9:47]
+
+sem_cog_vars <- colnames(sem_cogdata)[48:ncol(sem_cogdata)]
+
+```
+
+
+## Specify model with all variables
+
+```{r}
+
+sem_enviro_model <- '
+environment =~ EthIdentExploration + EthIdentCommitment + FamObligation + FamReferent + FamSupport + IndepSelfReliance + Religion + 
+FamConflict_P + ParentMonitoring + FamConflict_Y + ParentAcceptance + SchoolEnvironment + SchoolInvolvement + SchoolDisengagement + 
+NeighSafety_P + NeighSafety_Y + Walkability + NO2Exposure + PM25Exposure + ProxRoads + ResDensity + CrimePC + ADI_Edu_LTHS + 
+ADI_Edu_HSDip + ADI_Occ_WhiteCollar + ADI_MedianFamInc + ADI_IncDisparityIdx + ADI_MedianHomeValue + ADI_MedianGrossRent + ADI_MedianMonthMortg +   ADI_PercHOwner + ADI_PercUnemp + ADI_PercFamPoverty + ADI_PercPovBelow128 + ADI_PercSingle + ADI_PercLogNCar + ADI_PercLogNTel +ADI_PercLogNPlumb +     ADI_PercCrowding
+
+
+sociodem =~ Age + Male + White + Black + Hispanic + Asian + Income + Education
+
+cogfunc =~ NIH_ListSorting_Scores + NIH_PicVocab + NIH_Flanker + NIH_CardSort + NIH_PatternComp + NIH_PicSeqMem + NIH_Reading + 
+WISC_Matrix + RAVLT_ShortDel + RAVLT_LongDel + LittleMan + CashChoice + Neuro_0back + Neuro_2back + Neuro_EmoRec + Neuro_StopSig + 
+Neuro_MID
+
+environment ~ a*sociodem 
+
+cogfunc ~ b*environment + c*sociodem
+
+indirect := a*b
+direct := c
+total := c + (a*b)
+
+'
+
+```
+
+
+## Fit all variable model 
+
+```{r}
+
+sem_enviro_allvar <- sem(sem_enviro_model, sem_cogdata)
+
+summary(sem_enviro_allvar, standardized = TRUE, fit.measures = TRUE)
+```
+
+
+## Rudimentary plot for SEM mediation with latent enviro variable from all ABCD measures
+
+```{r}
+
+pathfig_allvars <- semPaths(sem_enviro_allvar, what = "stand", whatLabels = "stand", layout = "tree2", rotation = 1)
+
+```
+
+
+## Create SEM Model using Neighborhood, Home, School, and Culture latent variables for 4-way Environment mediation
+
+```{r}
+
+grouped_enviro_model <- '
+neighborhood =~ NeighSafety_P + NeighSafety_Y + Walkability + NO2Exposure + 
+PM25Exposure + ProxRoads + ResDensity + CrimePC + ADI_Edu_LTHS + 
+ADI_Edu_HSDip + ADI_Occ_WhiteCollar + ADI_MedianFamInc + ADI_IncDisparityIdx + 
+ADI_MedianHomeValue + ADI_MedianGrossRent + ADI_MedianMonthMortg +   ADI_PercHOwner + 
+ADI_PercUnemp + ADI_PercFamPoverty + ADI_PercPovBelow128 + ADI_PercSingle + 
+ADI_PercLogNCar + ADI_PercLogNTel +ADI_PercLogNPlumb +   ADI_PercCrowding
+
+home =~ FamConflict_P + ParentMonitoring + FamConflict_Y + ParentAcceptance
+
+school =~ SchoolEnvironment + SchoolInvolvement + SchoolDisengagement
+
+culture =~ EthIdentExploration + EthIdentCommitment + FamObligation + FamReferent + 
+FamSupport + IndepSelfReliance + Religion
+
+sociodem =~ Age + Male + White + Black + Hispanic + Asian + Income + Education
+
+cogfunc =~ NIH_ListSorting_Scores + NIH_PicVocab + NIH_Flanker + NIH_CardSort + 
+NIH_PatternComp + NIH_PicSeqMem + NIH_Reading + WISC_Matrix + RAVLT_ShortDel + 
+RAVLT_LongDel + LittleMan + CashChoice + Neuro_0back + Neuro_2back + 
+Neuro_EmoRec + Neuro_StopSig + Neuro_MID
+
+neighborhood ~ a1 * sociodem
+home ~ a2 *sociodem
+school ~ a3 * sociodem
+culture ~ a4 * sociodem
+
+cogfunc ~ c * sociodem
+
+cogfunc ~ b1 * neighborhood
+cogfunc ~ b2 * home
+cogfunc ~ b3 * school
+cogfunc ~ b4 * culture
+
+neighborhood ~~ home
+neighborhood ~~ school
+neighborhood ~~ culture
+home ~~ school
+home ~~ culture
+school ~~ culture
+
+direct := c
+
+indirect1 := a1*b1
+indirect2 := a2*b2
+indirect3 := a3*b3
+indirect4 := a4*b4
+
+contrast1 := indirect1 - indirect2
+contrast2 := indirect1 - indirect3
+contrast3 := indirect1 - indirect4
+contrast4 := indirect2 - indirect3
+contrast5 := indirect2 - indirect4
+contrast6 := indirect3 - indirect4
+
+total := c + (a1*b1) + (a2*b2) + (a3*b3) + (a4*b4)
+
+'
+
+```
+
+
+## Fit 4-way mediation model
+
+```{r}
+
+sem_enviro_groupvar <- sem(grouped_enviro_model, sem_cogdata)
+
+summary(sem_enviro_groupvar, standardized = TRUE, fit.measures = TRUE)
+
+```
+
+
+## Rudimentary plot for model with 4-way mediation using environment category lvs
+
+```{r}
+
+pathfig_groupvar <- semPaths(sem_enviro_groupvar, what = "stand", whatLabels = "stand", layout = "tree2", rotation = 4)
+
+```
+
+
+## Individual SEM models for each environmental factor category
+
+```{r}
+
+enviro_neigh_model <- '
+neighborhood =~ NeighSafety_P + NeighSafety_Y + Walkability + NO2Exposure + PM25Exposure + ProxRoads + ResDensity + CrimePC + ADI_Edu_LTHS + 
+ADI_Edu_HSDip + ADI_Occ_WhiteCollar + ADI_MedianFamInc + ADI_IncDisparityIdx + ADI_MedianHomeValue + ADI_MedianGrossRent + ADI_MedianMonthMortg +   ADI_PercHOwner + ADI_PercUnemp + ADI_PercFamPoverty + ADI_PercPovBelow128 + ADI_PercSingle + ADI_PercLogNCar + ADI_PercLogNTel +ADI_PercLogNPlumb +   ADI_PercCrowding
+
+sociodem =~ Age + Male + White + Black + Hispanic + Asian + Income + Education
+
+cogfunc =~ NIH_ListSorting_Scores + NIH_PicVocab + NIH_Flanker + NIH_CardSort + NIH_PatternComp + NIH_PicSeqMem + NIH_Reading + 
+WISC_Matrix + RAVLT_ShortDel + RAVLT_LongDel + LittleMan + CashChoice + Neuro_0back + Neuro_2back + Neuro_EmoRec + Neuro_StopSig + 
+Neuro_MID
+
+neighborhood ~ a*sociodem 
+
+cogfunc ~ b*neighborhood + c*sociodem
+
+indirect := a*b
+direct := c
+total := c + (a*b)
+
+'
+
+enviro_home_model <- '
+home =~ FamConflict_P + ParentMonitoring + FamConflict_Y + ParentAcceptance
+
+sociodem =~ Age + Male + White + Black + Hispanic + Asian + Income + Education
+
+cogfunc =~ NIH_ListSorting_Scores + NIH_PicVocab + NIH_Flanker + NIH_CardSort + NIH_PatternComp + NIH_PicSeqMem + NIH_Reading + 
+WISC_Matrix + RAVLT_ShortDel + RAVLT_LongDel + LittleMan + CashChoice + Neuro_0back + Neuro_2back + Neuro_EmoRec + Neuro_StopSig + 
+Neuro_MID
+
+home ~ a*sociodem 
+
+cogfunc ~ b*home + c*sociodem
+
+indirect := a*b
+direct := c
+total := c + (a*b)
+
+'
+
+enviro_school_model <- '
+school =~ SchoolEnvironment + SchoolInvolvement + SchoolDisengagement
+
+sociodem =~ Age + Male + White + Black + Hispanic + Asian + Income + Education
+
+cogfunc =~ NIH_ListSorting_Scores + NIH_PicVocab + NIH_Flanker + NIH_CardSort + NIH_PatternComp + NIH_PicSeqMem + NIH_Reading + 
+WISC_Matrix + RAVLT_ShortDel + RAVLT_LongDel + LittleMan + CashChoice + Neuro_0back + Neuro_2back + Neuro_EmoRec + Neuro_StopSig + 
+Neuro_MID
+
+school ~ a*sociodem 
+
+cogfunc ~ b*school + c*sociodem
+
+indirect := a*b
+direct := c
+total := c + (a*b)
+
+'
+
+enviro_culture_model <- '
+culture =~ EthIdentExploration + EthIdentCommitment + FamObligation + FamReferent + FamSupport + IndepSelfReliance + Religion
+
+sociodem =~ Age + Male + White + Black + Hispanic + Asian + Income + Education
+
+cogfunc =~ NIH_ListSorting_Scores + NIH_PicVocab + NIH_Flanker + NIH_CardSort + NIH_PatternComp + NIH_PicSeqMem + NIH_Reading + 
+WISC_Matrix + RAVLT_ShortDel + RAVLT_LongDel + LittleMan + CashChoice + Neuro_0back + Neuro_2back + Neuro_EmoRec + Neuro_StopSig + 
+Neuro_MID
+
+culture ~ a*sociodem 
+
+cogfunc ~ b*culture + c*sociodem
+
+indirect := a*b
+direct := c
+total := c + (a*b)
+
+'
+```
+
+
+## Fits, visualizations, and summaries for individual models
+
+```{r}
+
+sem_enviro_neigh <- sem(enviro_neigh_model, sem_cogdata)
+
+sem_enviro_home <- sem(enviro_home_model, sem_cogdata)
+
+sem_enviro_school <- sem(enviro_school_model, sem_cogdata)
+
+sem_enviro_cult <- sem(enviro_culture_model, sem_cogdata)
+
+
+```
+ 
+
+## Neighborhood figure 
+
+```{r}
+pathfig_groupvar <- semPaths(sem_enviro_neigh, what = "stand", whatLabels = "stand", layout = "tree2", rotation = 4)
+
+```
+ 
+ 
+## Home figure 
+
+```{r}
+pathfig_groupvar <- semPaths(sem_enviro_home, what = "stand", whatLabels = "stand", layout = "tree2", rotation = 4)
+
+```
+ 
+ 
+## School figure 
+
+```{r}
+pathfig_groupvar <- semPaths(sem_enviro_school, what = "stand", whatLabels = "stand", layout = "tree2", rotation = 4)
+
+```
+
+
+## Culture figure
+
+```{r}
+pathfig_groupvar <- semPaths(sem_enviro_cult, what = "stand", whatLabels = "stand", layout = "tree2", rotation = 4)
+
+```
+
+
+## Neighborhood model summary
+
+```{r}
+summary(sem_enviro_neigh, standardized = TRUE, fit.measures = TRUE)
+```
+
+
+## Home model summary
+
+```{r}
+summary(sem_enviro_home, standardized = TRUE, fit.measures = TRUE)
+```
+
+
+## School model summary
+
+```{r}
+summary(sem_enviro_school, standardized = TRUE, fit.measures = TRUE)
+```
+
+
+## Culture model summary
+
+```{r}
+summary(sem_enviro_cult, standardized = TRUE, fit.measures = TRUE)
+```
+

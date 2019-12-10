@@ -1,0 +1,1155 @@
+---
+title: "ABCD_EnvVars_CanCorr"
+author: "Wesley Meredith"
+output: pdf_document
+---
+
+
+Import libraries 
+
+```{r libraries, warning=FALSE, message=FALSE}
+library(CCA)
+library(mosaic)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(plyr)
+library(RGCCA)
+library(Hmisc)
+library(reshape2)
+
+#add functions for bootstrapping can corrs
+source("/Users/wesleymeredith/Documents/github_repos/cancorr_bootstrap/bootstrap.r", echo = FALSE)
+source("/Users/wesleymeredith/Documents/github_repos/cancorr_bootstrap/sgcca.bootstrap.r", echo = FALSE)
+source("/Users/wesleymeredith/Documents/github_repos/cancorr_bootstrap/aci.rgcca.r", echo = FALSE)
+
+# set directory
+data_dir <- "/Users/wesleymeredith/Documents/data/ABCD_release_2.0/"
+data_dir_subs <- "/Users/wesleymeredith/Documents/data/0_data_output/enviro_factors/enviro_output/"
+```
+
+## Import residuals for environment variables and all cog scores, add colors used for enviro categories
+
+Note that further into the script, txt files from Release 1.1 and Release 2 are required. I am currently searching for a variable that indicates while release a participant's data were first available for to eliminate the need for importing a Release 1.1 file.
+
+
+```{r import_vars, message = FALSE, warning = FALSE}
+
+allcog_vars <- read_csv(paste(data_dir_subs, 'ABCD_EnvVars_allcog.csv', sep = '')) %>%
+  select(-Other)
+
+color_teal <- "#77AAAD"
+color_grey <- "#6E7783"
+color_red <-  "#D7191C"
+color_orange <- "#d2a273"
+color_green<- "#729c6c"
+color_blue <- "#2B83BA"
+
+```
+
+
+Z score the residuals, separate the enviro variables and outcome variables 
+
+```{r}
+
+allcog_zscores <- data.frame(matrix(nrow = nrow(allcog_vars), ncol = ncol(allcog_vars)))
+
+
+for (i in 1:ncol(allcog_vars)){
+    tmp_zscore <- as.matrix(zscore(allcog_vars[[i]]))
+    allcog_zscores[,i] <-  tmp_zscore
+    
+}
+
+
+colnames(allcog_zscores) <- colnames(allcog_vars)
+
+write_csv(allcog_zscores, paste(data_dir_subs, 'allcogvars_zscore.csv', sep = ''))
+
+envirovars_zscore <- allcog_zscores[,1:47]
+
+cogscores_zscore <- allcog_zscores[,48:ncol(allcog_zscores)]
+```
+
+
+## Conduct canonical correlation analysis 
+
+Correlate variables within and between enviro vars and cog scores
+```{r}
+
+correl <- matcor(envirovars_zscore, cogscores_zscore)
+
+img.matcor(correl, type = 2)
+
+img.matcor(correl, type = 1)
+
+```
+
+
+# RGCCA Canonical correlation  
+Because the bootstrapping is time consuming and I wanted to more quickly access the results over time for generating my own figures for slides, etc., I save out the results from each CCA and bootstrap. 
+
+```{r}
+
+A <- list(envirovars_zscore, cogscores_zscore)
+
+C <- matrix(c(0, 1, 1, 0), 2, 2)
+
+result.rgcca_cogvars = rgcca(A, C, tau = c(1, 1), scheme = "factorial", scale = TRUE,verbose = F, ncom = rep(10, length(A)))
+
+
+save(result.rgcca_cogvars, file = "allcogvar_cca.RData")
+
+
+```
+
+Dim 1 plot 
+
+```{r}
+
+rgcca_cogvars.bootstrap.dim1 = aci.rgcca(object = result.rgcca_cogvars,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 1)
+
+save(rgcca_cogvars.bootstrap.dim1, file = "allcogvar_cca_boot1.RData")
+
+```
+
+Dim 2 plot
+
+```{r}
+
+rgcca_cogvars.bootstrap.dim2 = aci.rgcca(object = result.rgcca_cogvars,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 2)
+
+save(rgcca_cogvars.bootstrap.dim2, file = "allcogvar_cca_boot2.RData")
+
+```
+
+
+Dim 3 plot
+
+```{r}
+
+rgcca_cogvars.bootstrap.dim3 = aci.rgcca(object = result.rgcca_cogvars,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 3)
+
+save(rgcca_cogvars.bootstrap.dim3, file = "allcogvar_cca_boot3.RData")
+
+```
+
+
+Dim 4 plot 
+
+```{r}
+
+rgcca_cogvars.bootstrap.dim4 = aci.rgcca(object = result.rgcca_cogvars,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 4)
+
+save(rgcca_cogvars.bootstrap.dim4, file = "allcogvar_cca_boot4.RData")
+
+```
+
+
+## Complete split half comparisons
+
+Append subject ID and site ID data for making split half decisions and make the split half groups
+
+Here a Release 1.1 and Release 2 txt file are required.
+
+```{r}
+
+full_casesubs <- read_csv(paste(data_dir_subs, 'final_subjectlist_allcog.csv', sep = ''))
+
+SiteID       <- read.delim(paste(data_dir, 'abcd_lt01.txt', sep = ''), na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>% slice(-1) %>%
+  filter(eventname == "baseline_year_1_arm_1") %>%
+  select(src_subject_id, site_id_l) %>%
+  filter(src_subject_id %in% full_casesubs[[1]])
+
+site_allcogzscores <- allcog_zscores %>%
+  mutate(subject_id = SiteID$src_subject_id,
+         study_site = SiteID$site_id_l)
+
+#Separate by a simple half-split
+first_half_envirozscore <- envirovars_zscore[1:(floor(nrow(envirovars_zscore)/2)),] 
+first_half_cogzscore <- cogscores_zscore[1:(floor(nrow(cogscores_zscore)/2)),]
+
+last_half_envirozscore <- envirovars_zscore[(floor(nrow(envirovars_zscore)/2)+1): nrow(envirovars_zscore),]
+last_half_cogzscore <- cogscores_zscore[(floor(nrow(cogscores_zscore)/2)+1): nrow(cogscores_zscore),]
+
+#Separate first and second release participants
+
+### This part may need to be rewritten since it's using a text file from the previous release (1.1) ###
+first_release_subjects <- read.delim("/Users/wesleymeredith/Documents/data/ABCD1.1/acspsw02.txt", na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>%
+  slice(-1) %>% 
+  select(src_subject_id)
+
+first_release_allcogzscores <- site_allcogzscores %>%
+  filter(subject_id %in% first_release_subjects[[1]]) 
+
+second_release_allcogzscores <- site_allcogzscores %>%
+  filter(subject_id %nin% first_release_subjects[[1]]) 
+
+first_release_envirozscores <- first_release_allcogzscores %>%
+  select(1:47)
+
+first_release_cogzscores <- first_release_allcogzscores %>%
+  select(48:(ncol(first_release_allcogzscores)-2))
+
+second_release_envirozscores <- second_release_allcogzscores %>%
+  select(1:47)
+
+second_release_cogzscores <- second_release_allcogzscores %>%
+  select(48:(ncol(second_release_allcogzscores)-2))
+
+#Separate out sites into two groups
+
+studysite_list <- unique(site_allcogzscores$study_site)
+
+firstsite_allcogzscores <- site_allcogzscores %>%
+  filter(study_site %in% studysite_list[1:(length(studysite_list)/2)])
+
+secondsite_allcogzscores <- site_allcogzscores %>%
+  filter(study_site %in% studysite_list[((length(studysite_list)/2)+1):length(studysite_list)])
+
+firstsite_envirozscores <- firstsite_allcogzscores %>%
+  select(1:47)
+
+firstsite_cogzscores <- firstsite_allcogzscores %>%
+  select(48:(ncol(first_release_allcogzscores)-2))
+
+secondsite_envirozscores <- secondsite_allcogzscores %>%
+  select(1:47)
+
+secondsite_cogzscores <- secondsite_allcogzscores %>%
+  select(48:(ncol(second_release_allcogzscores)-2))
+
+```
+
+## Even half split
+
+Even split first half CCA 
+```{r}
+
+A_firsthalf <- list(first_half_envirozscore, first_half_cogzscore)
+A_secondhalf <- list(last_half_envirozscore, last_half_cogzscore)
+
+C <- matrix(c(0, 1, 1, 0), 2, 2)
+
+rgcca_firsthalf = rgcca(A_firsthalf, C, tau = c(1, 1), scheme = "factorial", scale = TRUE,verbose = F, ncom = rep(10, length(A)))
+
+save(rgcca_firsthalf, file = "allcogvar_cca_firsthalf.RData")
+
+```
+
+Even split first half dim 1 
+```{r}
+rgcca.bootstrap_firsthalf_dim1 = aci.rgcca(object = rgcca_firsthalf,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 1)
+
+save(rgcca.bootstrap_firsthalf_dim1, file = "allcogvar_cca_first_halfboot1.RData")
+```
+
+
+Even split first half dim 2 
+```{r}
+rgcca.bootstrap_firsthalf_dim2 = aci.rgcca(object = rgcca_firsthalf,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim  = 2)
+
+save(rgcca.bootstrap_firsthalf_dim2, file = "allcogvar_cca_first_halfboot2.RData")
+```
+
+Even split first half dim 3
+```{r}
+rgcca.bootstrap_firsthalf_dim3 = aci.rgcca(object = rgcca_firsthalf,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim  = 3)
+
+save(rgcca.bootstrap_firsthalf_dim3, file = "allcogvar_cca_first_halfboot3.RData")
+```
+
+
+Even split first half dim 4 
+```{r}
+rgcca.bootstrap_firsthalf_dim4 = aci.rgcca(object = rgcca_firsthalf,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim  = 4)
+
+save(rgcca.bootstrap_firsthalf_dim4, file = "allcogvar_cca_first_halfboot4.RData")
+```
+
+
+## Even split second half CCA
+```{r}
+
+rgcca_secondhalf = rgcca(A_secondhalf, C, tau = c(1, 1), scheme = "factorial", scale = TRUE,verbose = F, ncom = rep(10, length(A)))
+
+
+```
+
+Even split second half dim 1 
+```{r}
+rgcca.bootstrap_secondhalf_dim1 = aci.rgcca(object = rgcca_secondhalf,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 1)
+
+save(rgcca.bootstrap_secondhalf_dim1, file = "allcogvar_cca_second_halfboot1.RData")
+```
+
+Even split second half Dim 2 
+```{r}
+rgcca.bootstrap_secondhalf_dim2 = aci.rgcca(object = rgcca_secondhalf,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 2)
+
+save(rgcca.bootstrap_secondhalf_dim2, file = "allcogvar_cca_second_halfboot2.RData")
+```
+
+
+Even split second half Dim 3
+```{r}
+
+rgcca.bootstrap_secondhalf_dim3 = aci.rgcca(object = rgcca_secondhalf,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 3)
+
+save(rgcca.bootstrap_secondhalf_dim3, file = "allcogvar_cca_second_halfboot3.RData")
+
+```
+
+Even split second half Dim 4
+```{r}
+rgcca.bootstrap_secondhalf_dim4 = aci.rgcca(object = rgcca_secondhalf,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 4,
+          nb_cores = 3)
+
+save(rgcca.bootstrap_secondhalf_dim4, file = "allcogvar_cca_second_halfboot4.RData")
+```
+
+
+## Comparing even split first and second half
+```{r}
+
+(evensplit_cor_dim1 <- cor.test(rgcca_firsthalf$a[[1]][,1], rgcca_secondhalf$a[[1]][,1], method = "spearman"))
+
+(evensplit_cor_dim2 <- cor.test(rgcca_firsthalf$a[[1]][,2], rgcca_secondhalf$a[[1]][,2], method = "spearman"))
+
+(evensplit_cor_dim3 <- cor.test(rgcca_firsthalf$a[[1]][,3], rgcca_secondhalf$a[[1]][,3], method = "spearman"))
+
+(evensplit_cor_dim4 <- cor.test(rgcca_firsthalf$a[[1]][,4], rgcca_secondhalf$a[[1]][,4], method = "spearman"))
+
+```
+
+
+## First and Second release split
+
+first release CCA 
+```{r}
+
+A_firstrelease <- list(first_release_envirozscores, first_release_cogzscores)
+A_secondrelease <- list(second_release_envirozscores, second_release_cogzscores)
+
+C <- matrix(c(0, 1, 1, 0), 2, 2)
+
+rgcca_firstrel = rgcca(A_firstrelease, C, tau = c(1, 1), scheme = "factorial", scale = TRUE,verbose = F, ncom = rep(10, length(A)))
+
+save(rgcca_firstrel, file = "allcogvar_cca_firstrel.RData")
+
+```
+
+First release 1st dim
+```{r}
+rgcca.bootstrap_firstrel_boot1 = aci.rgcca(object = rgcca_firstrel,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 1,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_firstrel_boot1, file = "allcogvar_cca_firstrel_boot1.RData")
+
+
+```
+
+First release 2nd dim 
+```{r}
+
+rgcca.bootstrap_firstrel_boot2 = aci.rgcca(object = rgcca_firstrel,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 2,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_firstrel_boot2, file = "allcogvar_cca_firstrel_boot2.RData")
+
+```
+
+First release 3rd dim 
+```{r}
+
+rgcca.bootstrap_firstrel_boot3 = aci.rgcca(object = rgcca_firstrel,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 3,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_firstrel_boot3, file = "allcogvar_cca_firstrel_boot3.RData")
+
+```
+
+
+First release 4th dim 
+```{r}
+
+rgcca.bootstrap_firstrel_boot4 = aci.rgcca(object = rgcca_firstrel,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 4,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_firstrel_boot4, file = "allcogvar_cca_firstrel_boot4.RData")
+
+```
+
+
+## Second elease CCA 
+```{r}
+
+rgcca_secondrel = rgcca(A_secondrelease, C, tau = c(1, 1), scheme = "factorial", scale = TRUE,verbose = F, ncom = rep(10, length(A)))
+
+save(rgcca_secondrel, file = "allcogvar_cca_secondrel.RData")
+
+```
+
+Second release dim 1
+```{r}
+
+rgcca.bootstrap_secondrel_boot1 = aci.rgcca(object = rgcca_secondrel,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 1,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_secondrel_boot1, file = "allcogvar_cca_secondrel_boot1.RData")
+
+```
+
+Second release, dim 2 
+```{r}
+
+rgcca.bootstrap_secondrel_boot2 = aci.rgcca(object = rgcca_secondrel,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 2,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_secondrel_boot2, file = "allcogvar_cca_secondrel_boot2.RData")
+
+```
+
+
+Second release, dim 3
+```{r}
+
+rgcca.bootstrap_secondrel_boot3 = aci.rgcca(object = rgcca_secondrel,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 3,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_secondrel_boot3, file = "allcogvar_cca_secondrel_boot3.RData")
+
+```
+
+Second release, dim 4
+```{r}
+
+rgcca.bootstrap_secondrel_boot4 = aci.rgcca(object = rgcca_secondrel,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 4,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_secondrel_boot4, file = "allcogvar_cca_secondrel_boot4.RData")
+
+```
+
+## Compare first and second release split
+```{r}
+
+(releasesplit_cor_dim1 <- cor.test(rgcca_firstrel$a[[1]][,1], rgcca_secondrel$a[[1]][,1], mtehod = "spearman"))
+
+(releasesplit_cor_dim2 <- cor.test(rgcca_firstrel$a[[1]][,2], rgcca_secondrel$a[[1]][,2], mtehod = "spearman"))
+
+(releasesplit_cor_dim3 <- cor.test(rgcca_firstrel$a[[1]][,3], rgcca_secondrel$a[[1]][,3], mtehod = "spearman"))
+
+(releasesplit_cor_dim4 <- cor.test(rgcca_firstrel$a[[1]][,4], rgcca_secondrel$a[[1]][,4], mtehod = "spearman"))
+
+```
+
+
+# Site splot, random
+Moving forward, will need to seed a series of random combinations of the sites for split comparisons
+
+Because the site numbers aren't in chronological order, for my first pass at site splitting, I just used the order of occurrence for each unique site numbering to split down the middle.
+
+First site split CCA
+```{r}
+
+A_firstsite <- list(firstsite_envirozscores, firstsite_cogzscores)
+A_secondsite <- list(secondsite_envirozscores, secondsite_cogzscores)
+
+C <- matrix(c(0, 1, 1, 0), 2, 2)
+
+rgcca_firstsite = rgcca(A_firstsite, C, tau = c(1, 1), scheme = "factorial", scale = TRUE,verbose = F, ncom = rep(10, length(A)))
+
+save(rgcca_firstsite, file = "allcogvar_cca_firstsite.RData")
+
+```
+
+First site split dim 1 
+
+```{r}
+
+rgcca.bootstrap_firstsite_boot1 = aci.rgcca(object = rgcca_firstsite,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 1,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_firstsite_boot1, file = "allcogvar_cca_firstsite_boot1.RData")
+
+```
+
+First site split dim 2
+
+```{r}
+
+rgcca.bootstrap_firstsite_boot2 = aci.rgcca(object = rgcca_firstsite,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 2,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_firstsite_boot2, file = "allcogvar_cca_firstsite_boot2.RData")
+
+```
+
+First site split dim 3
+
+```{r}
+
+rgcca.bootstrap_firstsite_boot3 = aci.rgcca(object = rgcca_firstsite,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 3,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_firstsite_boot3, file = "allcogvar_cca_firstsite_boot3.RData")
+
+```
+
+First site split dim 4
+
+```{r}
+
+rgcca.bootstrap_firstsite_boot4 = aci.rgcca(object = rgcca_firstsite,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 4,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_firstsite_boot4, file = "allcogvar_cca_firstsite_boot4.RData")
+
+```
+
+
+Second site split CCA
+```{r}
+
+rgcca_secondsite = rgcca(A_secondsite, C, tau = c(1, 1), scheme = "factorial", scale = TRUE,verbose = F, ncom = rep(10, length(A)))
+
+save(rgcca_secondsite, file = "allcogvar_cca_secondsite.RData")
+
+```
+
+Second split dim 1
+
+```{r}
+
+rgcca.bootstrap_secondsite_boot1 = aci.rgcca(object = rgcca_secondsite,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 1,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_secondsite_boot1, file = "allcogvar_cca_secondsite_boot1.RData")
+
+```
+
+Second split dim 2
+
+```{r}
+
+rgcca.bootstrap_secondsite_boot2 = aci.rgcca(object = rgcca_secondsite,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 2,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_secondsite_boot2, file = "allcogvar_cca_secondsite_boot2.RData")
+
+```
+
+Second split dim 3
+
+```{r}
+
+rgcca.bootstrap_secondsite_boot3 = aci.rgcca(object = rgcca_secondsite,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 3,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_secondsite_boot3, file = "allcogvar_cca_secondsite_boot3.RData")
+
+```
+
+Second split dim 4
+
+```{r}
+
+rgcca.bootstrap_secondsite_boot4 = aci.rgcca(object = rgcca_secondsite,
+          A = A,
+          B = 10000,
+          alpha = 0.05,
+          plot = "all",
+          ndim = 4,
+          nb_cores = 4)
+
+save(rgcca.bootstrap_secondsite_boot4, file = "allcogvar_cca_secondsite_boot4.RData")
+
+```
+
+
+## Compare site splits 
+
+```{r}
+
+(sitesplit_cor_dim1 <- cor.test(rgcca_firstsite$a[[1]][,1], rgcca_secondsite$a[[1]][,1], method = "spearman"))
+
+(sitesplit_cor_dim2 <- cor.test(rgcca_firstsite$a[[1]][,2], rgcca_secondsite$a[[1]][,2], method = "spearman"))
+
+(sitesplit_cor_dim3 <- cor.test(rgcca_firstsite$a[[1]][,3], rgcca_secondsite$a[[1]][,3], method = "spearman"))
+
+(sitesplit_cor_dim4 <- cor.test(rgcca_firstsite$a[[1]][,4], rgcca_secondsite$a[[1]][,4], method = "spearman"))
+
+firstsite_allweight <- melt(rgcca_firstsite$a[[1]], id.vars = 1:2) %>%
+  filter(Var2 %in% c(1:2)) %>%
+  select(value)
+
+secondsite_allweight <- melt(rgcca_secondsite$a[[1]], id.vars = 1:2) %>%
+  filter(Var2 %in% c(1:2)) %>%
+  select(value)
+
+(sitesplit_cor_alldim <- cor.test(firstsite_allweight[[1]], secondsite_allweight[[1]], method = "spearman"))
+
+```
+
+## Gather data for creating personal CCA plots
+
+For speed, I duplicated this code to generate the plots from individual data frames (many of which just overwrite the new data frame variable for the previous plot). When I circle back, I plan to gather all the results across dimensions using gather/spread to create columns for dimension and variable type so these plots can be generated more easily by filtering for the desired dimension
+
+```{r}
+
+combined_envirovar_list <- read_csv(paste(data_dir_subs, 'ABCD_EnvVars_combinedlist.csv', sep = ''))
+
+fullcca_enviro <- data.frame(Weight =result.rgcca_cogvars$a[[1]][,1], Variable = rownames(result.rgcca_cogvars$a[[1]]))
+rownames(fullcca_enviro) <- c()
+
+## merge weight columns
+
+fullcca_enviro_CI <- data.frame(rgcca_cogvars.bootstrap.dim1$CI[[1]][,2:3],
+                                Variable = rownames(rgcca_cogvars.bootstrap.dim1$CI[[1]]))
+rownames(fullcca_enviro_CI) <- c()
+
+fullcca_enviro <- left_join(fullcca_enviro, fullcca_enviro_CI, by = "Variable") %>%
+  left_join(combined_envirovar_list, by = "Variable") 
+  
+fullcca_enviro$Category[1:8] <- "Demo"
+
+fullcca_enviro$Category <- factor(fullcca_enviro$Category)
+
+### This commented section is preliminary work gathering all the results into a single data frame for easier use visualizing by filtering
+
+# fullcca_enviro <- fullcca_enviro %>%
+#   gather(Weight.1, Weight.2, Weight.3, Weight.4, key = "Dimension", value = "weight") %>%
+#   gather(Dim1.Lower.Bound,Dim2.Lower.Bound, Dim3.Lower.Bound, Dim4.Lower.Bound, key = "lower_dim", value = "lower_CI") %>%
+#   gather(Dim1.Upper.Bound, Dim2.Upper.Bound, Dim3.Upper.Bound, Dim4.Upper.Bound, key = "upper_dim", value = "upper_CI")
+
+###
+
+## Cog Vars
+
+fullcca_cog <- data.frame(Weight =result.rgcca_cogvars$a[[2]][,1], Variable = rownames(result.rgcca_cogvars$a[[2]]))
+rownames(fullcca_cog) <- c()
+
+fullcca_cog_CI <- data.frame(rgcca_cogvars.bootstrap.dim1$CI[[2]][,2:3], Variable = rownames(rgcca_cogvars.bootstrap.dim1$CI[[2]]))
+rownames(fullcca_cog_CI) <- c()
+
+# fullcca_cog <- left_join(fullcca_cog, fullcca_cog_CI, by = "Variable") %>%
+#       mutate(Variable = factor(Variable, levels = c("Neuro_StopSig", "Neuro_MID", "Neuro_EmoRec", "Neuro_0back", "Neuro_2back",
+#                                                   "WISC_Matrix", "RAVLT_ShortDel", "RAVLT_LongDel", "CashChoice", "LittleMan","NIH_Reading",
+#                                                   "NIH_PicVocab", "NIH_PicSeqMem", "NIH_PatternComp", "NIH_ListSorting_Scores",
+#                                                   "NIH_Flanker", "NIH_CardSort")),
+#            Type = c("NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NeuroCog", "NeuroCog", "NeuroCog", "NeuroCog",
+#                     "NeuroCog", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag")) %>%
+#   mutate(Type = factor(Type))
+
+fullcca_cog <- left_join(fullcca_cog, fullcca_cog_CI, by = "Variable") %>%
+      mutate(Type = c("NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NeuroCog", "NeuroCog", "NeuroCog", "NeuroCog",
+                    "NeuroCog", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag")) %>%
+  mutate(Type = factor(Type))
+
+```
+
+## Plotting personal CCA cog and enviro figs (all participants)
+
+```{r}
+
+(fullcca_enviro_fig <- ggplot(data = fullcca_enviro, aes(reorder(Variable, Variable), Weight)) +
+  geom_bar(data = fullcca_enviro, aes(fill = Category),stat = "identity") +
+  geom_errorbar(data = fullcca_enviro, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("Demo" = "gray", "Culture" = color_red, "Home" = color_orange, "Neighborhood" = color_green,
+                                         "School" = color_blue)) +
+  theme(axis.text.y = element_text(size = 7))
+  
+
+  
+(fullcca_cog_fig <- ggplot(data = fullcca_cog, aes(x = reorder(Variable, Variable), y = Weight)) +
+  geom_bar(data = fullcca_cog, aes(fill = Type),stat = "identity") +
+  geom_errorbar(data = fullcca_cog, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("NeuroCog" = "orange", "NeuroImag" = "thistle4", "NIH_tb" = "purple"))
+
+```
+
+Dim 2 Plot 
+
+```{r}
+
+fullcca_enviro <- data.frame(Weight =result.rgcca_cogvars$a[[1]][,2], Variable = rownames(result.rgcca_cogvars$a[[1]]))
+rownames(fullcca_enviro) <- c()
+
+## merge weight columns
+
+fullcca_enviro_CI <- data.frame(rgcca_cogvars.bootstrap.dim2$CI[[1]][,2:3],
+                                Variable = rownames(rgcca_cogvars.bootstrap.dim2$CI[[1]]))
+rownames(fullcca_enviro_CI) <- c()
+
+fullcca_enviro <- left_join(fullcca_enviro, fullcca_enviro_CI, by = "Variable") %>%
+  left_join(combined_envirovar_list, by = "Variable") 
+  
+fullcca_enviro$Category[1:8] <- "Demo"
+
+fullcca_enviro$Category <- factor(fullcca_enviro$Category)
+
+
+## Cog Vars
+
+fullcca_cog <- data.frame(Weight =result.rgcca_cogvars$a[[2]][,2], Variable = rownames(result.rgcca_cogvars$a[[2]]))
+rownames(fullcca_cog) <- c()
+
+fullcca_cog_CI <- data.frame(rgcca_cogvars.bootstrap.dim2$CI[[2]][,2:3], Variable = rownames(rgcca_cogvars.bootstrap.dim2$CI[[2]]))
+rownames(fullcca_cog_CI) <- c()
+
+
+fullcca_cog <- left_join(fullcca_cog, fullcca_cog_CI, by = "Variable") %>%
+      mutate(Type = c("NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NeuroCog", "NeuroCog", "NeuroCog", "NeuroCog",
+                    "NeuroCog", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag")) %>%
+  mutate(Type = factor(Type))
+
+#Plot
+
+(fullcca_envirodim2_fig <- ggplot(data = fullcca_enviro, aes(reorder(Variable, Variable), Weight)) +
+  geom_bar(data = fullcca_enviro, aes(fill = Category),stat = "identity") +
+  geom_errorbar(data = fullcca_enviro, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("Demo" = "gray", "Culture" = color_red, "Home" = color_orange, "Neighborhood" = color_green,
+                                         "School" = color_blue)) +
+  theme(axis.text.y = element_text(size = 7))
+  
+
+  
+(fullcca_cogdim2_fig <- ggplot(data = fullcca_cog, aes(x = reorder(Variable, Variable), y = Weight)) +
+  geom_bar(data = fullcca_cog, aes(fill = Type),stat = "identity") +
+  geom_errorbar(data = fullcca_cog, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("NeuroCog" = "orange", "NeuroImag" = "thistle4", "NIH_tb" = "purple"))
+
+```
+
+Dim 3 plot
+
+```{r}
+
+fullcca_enviro <- data.frame(Weight =result.rgcca_cogvars$a[[1]][,3], Variable = rownames(result.rgcca_cogvars$a[[1]]))
+rownames(fullcca_enviro) <- c()
+
+## merge weight columns
+
+fullcca_enviro_CI <- data.frame(rgcca_cogvars.bootstrap.dim3$CI[[1]][,2:3],
+                                Variable = rownames(rgcca_cogvars.bootstrap.dim3$CI[[1]]))
+rownames(fullcca_enviro_CI) <- c()
+
+fullcca_enviro <- left_join(fullcca_enviro, fullcca_enviro_CI, by = "Variable") %>%
+  left_join(combined_envirovar_list, by = "Variable") 
+  
+fullcca_enviro$Category[1:8] <- "Demo"
+
+fullcca_enviro$Category <- factor(fullcca_enviro$Category)
+
+
+## Cog Vars
+
+fullcca_cog <- data.frame(Weight =result.rgcca_cogvars$a[[2]][,3], Variable = rownames(result.rgcca_cogvars$a[[2]]))
+rownames(fullcca_cog) <- c()
+
+fullcca_cog_CI <- data.frame(rgcca_cogvars.bootstrap.dim3$CI[[2]][,2:3], Variable = rownames(rgcca_cogvars.bootstrap.dim3$CI[[2]]))
+rownames(fullcca_cog_CI) <- c()
+
+
+fullcca_cog <- left_join(fullcca_cog, fullcca_cog_CI, by = "Variable") %>%
+      mutate(Type = c("NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NeuroCog", "NeuroCog", "NeuroCog", "NeuroCog",
+                    "NeuroCog", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag")) %>%
+  mutate(Type = factor(Type))
+
+#Plot
+
+(fullcca_envirodim3_fig <- ggplot(data = fullcca_enviro, aes(reorder(Variable, Variable), Weight)) +
+  geom_bar(data = fullcca_enviro, aes(fill = Category),stat = "identity") +
+  geom_errorbar(data = fullcca_enviro, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("Demo" = "gray", "Culture" = color_red, "Home" = color_orange, "Neighborhood" = color_green,
+                                         "School" = color_blue)) +
+  theme(axis.text.y = element_text(size = 7))
+  
+
+  
+(fullcca_cogdim3_fig <- ggplot(data = fullcca_cog, aes(x = reorder(Variable, Variable), y = Weight)) +
+  geom_bar(data = fullcca_cog, aes(fill = Type),stat = "identity") +
+  geom_errorbar(data = fullcca_cog, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("NeuroCog" = "orange", "NeuroImag" = "thistle4", "NIH_tb" = "purple"))
+
+```
+
+
+## First Site Half Dim 1 
+
+```{r}
+
+sitefirsthalf_enviro <- data.frame(Weight =rgcca_firstsite$a[[1]][,1], Variable = rownames(rgcca_firstsite$a[[1]]))
+rownames(sitefirsthalf_enviro) <- c()
+
+## merge weight columns
+
+sitefirsthalf_enviro_CI <- data.frame(rgcca.bootstrap_firstsite_boot1$CI[[1]][,2:3],
+                                Variable = rownames(rgcca.bootstrap_firstsite_boot1$CI[[1]]))
+rownames(sitefirsthalf_enviro_CI) <- c()
+
+sitefirsthalf_enviro <- left_join(sitefirsthalf_enviro, sitefirsthalf_enviro_CI, by = "Variable") %>%
+  left_join(combined_envirovar_list, by = "Variable") 
+  
+sitefirsthalf_enviro$Category[1:8] <- "Demo"
+
+sitefirsthalf_enviro$Category <- factor(sitefirsthalf_enviro$Category)
+
+
+## Cog Vars
+
+sitefirsthalf_cog <- data.frame(Weight =rgcca_firstsite$a[[2]][,1], Variable = rownames(rgcca_firstsite$a[[2]]))
+rownames(sitefirsthalf_cog) <- c()
+
+sitefirsthalf_cog_CI <- data.frame(rgcca.bootstrap_firstsite_boot1$CI[[2]][,2:3], Variable = rownames(rgcca.bootstrap_firstsite_boot1$CI[[2]]))
+rownames(sitefirsthalf_cog_CI) <- c()
+
+
+sitefirsthalf_cog <- left_join(sitefirsthalf_cog, sitefirsthalf_cog_CI, by = "Variable") %>%
+      mutate(Type = c("NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NeuroCog", "NeuroCog", "NeuroCog", "NeuroCog",
+                    "NeuroCog", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag")) %>%
+  mutate(Type = factor(Type))
+
+#Plot
+
+(sitefirsthalf_envirodim3_fig <- ggplot(data = sitefirsthalf_enviro, aes(reorder(Variable, Variable), Weight)) +
+  geom_bar(data = sitefirsthalf_enviro, aes(fill = Category),stat = "identity") +
+  geom_errorbar(data = sitefirsthalf_enviro, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("Demo" = "gray", "Culture" = color_red, "Home" = color_orange, "Neighborhood" = color_green,
+                                         "School" = color_blue)) +
+  theme(axis.text.y = element_text(size = 7))
+  
+
+  
+(sitefirsthalf_cogdim3_fig <- ggplot(data = sitefirsthalf_cog, aes(x = reorder(Variable, Variable), y = Weight)) +
+  geom_bar(data = sitefirsthalf_cog, aes(fill = Type),stat = "identity") +
+  geom_errorbar(data = sitefirsthalf_cog, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("NeuroCog" = "orange", "NeuroImag" = "thistle4", "NIH_tb" = "purple"))
+
+```
+
+## First site split dim 2
+
+```{r}
+
+sitefirsthalf_enviro <- data.frame(Weight =rgcca_firstsite$a[[1]][,2], Variable = rownames(rgcca_firstsite$a[[1]]))
+rownames(sitefirsthalf_enviro) <- c()
+
+## merge weight columns
+
+sitefirsthalf_enviro_CI <- data.frame(rgcca.bootstrap_firstsite_boot2$CI[[1]][,2:3],
+                                Variable = rownames(rgcca.bootstrap_firstsite_boot2$CI[[1]]))
+rownames(sitefirsthalf_enviro_CI) <- c()
+
+sitefirsthalf_enviro <- left_join(sitefirsthalf_enviro, sitefirsthalf_enviro_CI, by = "Variable") %>%
+  left_join(combined_envirovar_list, by = "Variable") 
+  
+sitefirsthalf_enviro$Category[1:8] <- "Demo"
+
+sitefirsthalf_enviro$Category <- factor(sitefirsthalf_enviro$Category)
+
+
+## Cog Vars
+
+sitefirsthalf_cog <- data.frame(Weight =rgcca_firstsite$a[[2]][,2], Variable = rownames(rgcca_firstsite$a[[2]]))
+rownames(sitefirsthalf_cog) <- c()
+
+sitefirsthalf_cog_CI <- data.frame(rgcca.bootstrap_firstsite_boot2$CI[[2]][,2:3], Variable = rownames(rgcca.bootstrap_firstsite_boot2$CI[[2]]))
+rownames(sitefirsthalf_cog_CI) <- c()
+
+
+sitefirsthalf_cog <- left_join(sitefirsthalf_cog, sitefirsthalf_cog_CI, by = "Variable") %>%
+      mutate(Type = c("NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NeuroCog", "NeuroCog", "NeuroCog", "NeuroCog",
+                    "NeuroCog", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag")) %>%
+  mutate(Type = factor(Type))
+
+#Plot
+
+(sitefirsthalf_envirodim3_fig <- ggplot(data = sitefirsthalf_enviro, aes(reorder(Variable, Variable), Weight)) +
+  geom_bar(data = sitefirsthalf_enviro, aes(fill = Category),stat = "identity") +
+  geom_errorbar(data = sitefirsthalf_enviro, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("Demo" = "gray", "Culture" = color_red, "Home" = color_orange, "Neighborhood" = color_green,
+                                         "School" = color_blue)) +
+  theme(axis.text.y = element_text(size = 7))
+  
+
+  
+(sitefirsthalf_cogdim3_fig <- ggplot(data = sitefirsthalf_cog, aes(x = reorder(Variable, Variable), y = Weight)) +
+  geom_bar(data = sitefirsthalf_cog, aes(fill = Type),stat = "identity") +
+  geom_errorbar(data = sitefirsthalf_cog, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("NeuroCog" = "orange", "NeuroImag" = "thistle4", "NIH_tb" = "purple"))
+
+```
+
+## Second site split Dim 1
+
+```{r}
+
+sitesecondhalf_enviro <- data.frame(Weight =rgcca_secondsite$a[[1]][,1], Variable = rownames(rgcca_secondsite$a[[1]]))
+rownames(sitesecondhalf_enviro) <- c()
+
+## merge weight columns
+
+sitesecondhalf_enviro_CI <- data.frame(rgcca.bootstrap_secondsite_boot1$CI[[1]][,2:3],
+                                Variable = rownames(rgcca.bootstrap_secondsite_boot1$CI[[1]]))
+rownames(sitesecondhalf_enviro_CI) <- c()
+
+sitesecondhalf_enviro <- left_join(sitesecondhalf_enviro, sitesecondhalf_enviro_CI, by = "Variable") %>%
+  left_join(combined_envirovar_list, by = "Variable") 
+  
+sitesecondhalf_enviro$Category[1:8] <- "Demo"
+
+sitesecondhalf_enviro$Category <- factor(sitesecondhalf_enviro$Category)
+
+
+## Cog Vars
+
+sitesecondhalf_cog <- data.frame(Weight =rgcca_secondsite$a[[2]][,1], Variable = rownames(rgcca_secondsite$a[[2]]))
+rownames(sitesecondhalf_cog) <- c()
+
+sitesecondhalf_cog_CI <- data.frame(rgcca.bootstrap_secondsite_boot1$CI[[2]][,2:3], Variable = rownames(rgcca.bootstrap_secondsite_boot1$CI[[2]]))
+rownames(sitesecondhalf_cog_CI) <- c()
+
+
+sitesecondhalf_cog <- left_join(sitesecondhalf_cog, sitesecondhalf_cog_CI, by = "Variable") %>%
+      mutate(Type = c("NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NeuroCog", "NeuroCog", "NeuroCog", "NeuroCog",
+                    "NeuroCog", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag")) %>%
+  mutate(Type = factor(Type))
+
+#Plot
+
+(sitesecondhalf_envirodim1_fig <- ggplot(data = sitesecondhalf_enviro, aes(reorder(Variable, Variable), Weight)) +
+  geom_bar(data = sitesecondhalf_enviro, aes(fill = Category),stat = "identity") +
+  geom_errorbar(data = sitesecondhalf_enviro, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("Demo" = "gray", "Culture" = color_red, "Home" = color_orange, "Neighborhood" = color_green,
+                                         "School" = color_blue)) +
+  theme(axis.text.y = element_text(size = 7))
+  
+
+  
+(sitesecondhalf_cogdim1_fig <- ggplot(data = sitesecondhalf_cog, aes(x = reorder(Variable, Variable), y = Weight)) +
+  geom_bar(data = sitesecondhalf_cog, aes(fill = Type),stat = "identity") +
+  geom_errorbar(data = sitesecondhalf_cog, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("NeuroCog" = "orange", "NeuroImag" = "thistle4", "NIH_tb" = "purple"))
+
+```
+
+
+
+## Second site split Dim 2
+
+```{r}
+
+sitesecondhalf_enviro <- data.frame(Weight =rgcca_secondsite$a[[1]][,2], Variable = rownames(rgcca_secondsite$a[[1]]))
+rownames(sitesecondhalf_enviro) <- c()
+
+## merge weight columns
+
+sitesecondhalf_enviro_CI <- data.frame(rgcca.bootstrap_secondsite_boot2$CI[[1]][,2:3],
+                                Variable = rownames(rgcca.bootstrap_secondsite_boot2$CI[[1]]))
+rownames(sitesecondhalf_enviro_CI) <- c()
+
+sitesecondhalf_enviro <- left_join(sitesecondhalf_enviro, sitesecondhalf_enviro_CI, by = "Variable") %>%
+  left_join(combined_envirovar_list, by = "Variable") 
+  
+sitesecondhalf_enviro$Category[1:8] <- "Demo"
+
+sitesecondhalf_enviro$Category <- factor(sitesecondhalf_enviro$Category)
+
+
+## Cog Vars
+
+sitesecondhalf_cog <- data.frame(Weight =rgcca_secondsite$a[[2]][,2], Variable = rownames(rgcca_secondsite$a[[2]]))
+rownames(sitesecondhalf_cog) <- c()
+
+sitesecondhalf_cog_CI <- data.frame(rgcca.bootstrap_secondsite_boot2$CI[[2]][,2:3], Variable = rownames(rgcca.bootstrap_secondsite_boot2$CI[[2]]))
+rownames(sitesecondhalf_cog_CI) <- c()
+
+
+sitesecondhalf_cog <- left_join(sitesecondhalf_cog, sitesecondhalf_cog_CI, by = "Variable") %>%
+      mutate(Type = c("NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NIH_tb", "NeuroCog", "NeuroCog", "NeuroCog", "NeuroCog",
+                    "NeuroCog", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag", "NeuroImag")) %>%
+  mutate(Type = factor(Type))
+
+#Plot
+
+(sitesecondhalf_envirodim2_fig <- ggplot(data = sitesecondhalf_enviro, aes(reorder(Variable, Variable), Weight)) +
+  geom_bar(data = sitesecondhalf_enviro, aes(fill = Category),stat = "identity") +
+  geom_errorbar(data = sitesecondhalf_enviro, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("Demo" = "gray", "Culture" = color_red, "Home" = color_orange, "Neighborhood" = color_green,
+                                         "School" = color_blue)) +
+  theme(axis.text.y = element_text(size = 7))
+  
+
+  
+(sitesecondhalf_cogdim2_fig <- ggplot(data = sitesecondhalf_cog, aes(x = reorder(Variable, Variable), y = Weight)) +
+  geom_bar(data = sitesecondhalf_cog, aes(fill = Type),stat = "identity") +
+  geom_errorbar(data = sitesecondhalf_cog, mapping = aes(x = Variable, ymin = Lower.Bound, ymax = Upper.Bound)) +
+  theme_classic() +
+  coord_flip()) +
+  scale_fill_manual("legend", values = c("NeuroCog" = "orange", "NeuroImag" = "thistle4", "NIH_tb" = "purple"))
+
+```
+
