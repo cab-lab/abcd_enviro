@@ -30,16 +30,15 @@ QUICK NOTE: I still need to implement the exploratory/confirmatory split in the 
 
 sem_cogdata <- read_csv(paste(data_dir_subs, 'allcogvars_zscore.csv', sep = ''))
 
+#these aren't currently used, but wanted to be able to quickly label for any future visualizations if needed
 sem_sociodem_vars <- colnames(sem_cogdata)[1:8]
-
 sem_enviro_vars <- colnames(sem_cogdata)[9:47]
-
 sem_cog_vars <- colnames(sem_cogdata)[48:ncol(sem_cogdata)]
 
 ```
 
 
-## Specify model with all variables
+## Specify model with all variables (singular environment LV from all variables)
 
 ```{r}
 
@@ -93,6 +92,7 @@ pathfig_allvars <- semPaths(sem_enviro_allvar, what = "stand", whatLabels = "sta
 ```{r}
 
 grouped_enviro_model <- '
+## specifying LVs individually for neigh, home, school, culture; sociodem; and cog
 neighborhood =~ NeighSafety_P + NeighSafety_Y + Walkability + NO2Exposure + 
 PM25Exposure + ProxRoads + ResDensity + CrimePC + ADI_Edu_LTHS + 
 ADI_Edu_HSDip + ADI_Occ_WhiteCollar + ADI_MedianFamInc + ADI_IncDisparityIdx + 
@@ -114,18 +114,22 @@ NIH_PatternComp + NIH_PicSeqMem + NIH_Reading + WISC_Matrix + RAVLT_ShortDel +
 RAVLT_LongDel + LittleMan + CashChoice + Neuro_0back + Neuro_2back + 
 Neuro_EmoRec + Neuro_StopSig + Neuro_MID
 
+## setting up indirect paths (which includes the path labels) from sociodem 
 neighborhood ~ a1 * sociodem
 home ~ a2 *sociodem
 school ~ a3 * sociodem
 culture ~ a4 * sociodem
 
+## setting up direct path from sociodem to cogfunc
 cogfunc ~ c * sociodem
 
+#setting up "direct" paths from enviro LVs to cogfunc
 cogfunc ~ b1 * neighborhood
 cogfunc ~ b2 * home
 cogfunc ~ b3 * school
 cogfunc ~ b4 * culture
 
+## Measuring covariance between environmental factors
 neighborhood ~~ home
 neighborhood ~~ school
 neighborhood ~~ culture
@@ -133,13 +137,20 @@ home ~~ school
 home ~~ culture
 school ~~ culture
 
+## Pathways to analyze
+# direct path (standard "C," from sociodem to cogfunc)
 direct := c
 
+# indirect pathways through each enviro factor
 indirect1 := a1*b1
 indirect2 := a2*b2
 indirect3 := a3*b3
 indirect4 := a4*b4
 
+# total indirect, which adds each indirect effect 
+tot_indirect := indirect1 + indirect2 + indirect3 + indirect4
+
+# contrasted pathways, subtracting indirect paths from one another
 contrast1 := indirect1 - indirect2
 contrast2 := indirect1 - indirect3
 contrast3 := indirect1 - indirect4
@@ -147,7 +158,8 @@ contrast4 := indirect2 - indirect3
 contrast5 := indirect2 - indirect4
 contrast6 := indirect3 - indirect4
 
-total := c + (a1*b1) + (a2*b2) + (a3*b3) + (a4*b4)
+#total path, accounting for direct sociodem to cogfunc and all indirect enviro factor paths
+total := c + tot_indirect
 
 '
 
@@ -161,6 +173,8 @@ total := c + (a1*b1) + (a2*b2) + (a3*b3) + (a4*b4)
 sem_enviro_groupvar <- sem(grouped_enviro_model, sem_cogdata)
 
 summary(sem_enviro_groupvar, standardized = TRUE, fit.measures = TRUE)
+
+enviro_groupvar_params <- parameterEstimates(sem_enviro_groupvar, boot.ci.type = 'bca.simple')
 
 ```
 
@@ -194,7 +208,7 @@ cogfunc ~ b*neighborhood + c*sociodem
 
 indirect := a*b
 direct := c
-total := c + (a*b)
+total := c + indirect
 
 '
 
@@ -213,7 +227,7 @@ cogfunc ~ b*home + c*sociodem
 
 indirect := a*b
 direct := c
-total := c + (a*b)
+total := c + indirect
 
 '
 
@@ -232,7 +246,7 @@ cogfunc ~ b*school + c*sociodem
 
 indirect := a*b
 direct := c
-total := c + (a*b)
+total := c + indirect
 
 '
 
@@ -251,7 +265,7 @@ cogfunc ~ b*culture + c*sociodem
 
 indirect := a*b
 direct := c
-total := c + (a*b)
+total := c + indirect
 
 '
 ```
@@ -322,13 +336,17 @@ summary(sem_enviro_home, standardized = TRUE, fit.measures = TRUE)
 ## School model summary
 
 ```{r}
+
 summary(sem_enviro_school, standardized = TRUE, fit.measures = TRUE)
+
 ```
 
 
 ## Culture model summary
 
 ```{r}
+
 summary(sem_enviro_cult, standardized = TRUE, fit.measures = TRUE)
+
 ```
 
