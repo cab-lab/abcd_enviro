@@ -1,6 +1,6 @@
 ---
-title: "ABCD Environment PLS--Variable Setup_V3"
-author: "Carlos Cardenas-Iniguez"
+title: "ABCD Environment Variable Setup"
+author: "Carlos Cardenas-Iniguez, Wesley Meredith"
 date: "9/23/2019"
 output:
   pdf_document: default
@@ -44,7 +44,7 @@ data_dir_subs <- "/Users/wesleymeredith/Documents/data/0_data_output/enviro_fact
 In the following section, I will import the text file containing each variable, however, I am taking a two-step process, since the actual values do not begin until line 3. So: I first import the first line as the column names, and then combine that with the imported data using the `readr` package. 
 
 
-## DEmographic Variables
+## Demographic Variables
 
 This first section imports demographic variables, such as race, ethnicity, gender, and age.
 
@@ -104,27 +104,6 @@ acspsw03_family <- acspsw03 %>%
   filter(src_subject_id %in% data.family[[1]])
 ```
 
-## Grab the WISC fluid intelligence scores and working memory scores
-
-```{r}
-
-fluid_int <- read.delim(paste(data_dir,"abcd_ps01.txt",sep=""), na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>% slice(-1) %>%
-  filter(eventname == "baseline_year_1_arm_1") %>%
-  select(src_subject_id, pea_wiscv_tss)
-
-# outcome_vars <- left_join(combined_measures_complete, fluid_int) %>%
-#   select(src_subject_id,
-#          nihtbx_list_uncorrected,
-#          pea_wiscv_tss)
-
-# outcome_vars_family <- outcome_vars %>%
-#   filter(src_subject_id %in% data.family[[1]])
-
-# write.csv(outcome_vars, sprintf('%s/ABCD_outcome_vars.csv',data_dir_subs), row.names = FALSE)
-# 
-# write.csv(outcome_vars_family, sprintf('%s/ABCD_outcome_vars_family.csv',data_dir_subs), row.names = FALSE)
-
-```
 
 ## Socioeconomic Status Variables 
 
@@ -237,8 +216,8 @@ if (!('mice' %in% installed.packages()[,"Package"]))  install.packages('mice')
 library(data.table)
 library(mice)
 
-vars_for_imputation <- data.table(acspsw03$src_subject_id, acspsw03$interview_age, acspsw03$gender, acspsw03$race_ethnicity, pdem02$highest.education, pdem02$household.income, fluid_int$pea_wiscv_tss )
-dat_nms <-  c("src_subject_id", "age", "female", "race.ethnicity", "highest.education", "household.income", "pea_wiscv_tss")
+vars_for_imputation <- data.table(acspsw03$src_subject_id, acspsw03$interview_age, acspsw03$gender, acspsw03$race_ethnicity, pdem02$highest.education, pdem02$household.income)
+dat_nms <-  c("src_subject_id", "age", "female", "race.ethnicity", "highest.education", "household.income")
 
 colnames(vars_for_imputation) <- dat_nms
 
@@ -246,14 +225,13 @@ colnames(vars_for_imputation) <- dat_nms
 n.imp = 5
 n.iter = 10
 
-var.ls <- c("src_subject_id", "age", "female", "race.ethnicity", "highest.education", "household.income", "pea_wiscv_tss")
+var.ls <- c("src_subject_id", "age", "female", "race.ethnicity", "highest.education", "household.income")
 dat0 <- vars_for_imputation[, var.ls, with = FALSE ]
 dat0[, table(age, useNA = "if") ]
 dat0[, table(female, useNA = "if") ]
 dat0[, table(race.ethnicity, useNA = "if") ]
 dat0[, table(household.income, useNA = "if") ]
 dat0[, table(highest.education, useNA = "if") ]
-dat0[, table(pea_wiscv_tss, useNA = "if") ]
 
 ini <- mice( dat0, m = 1, maxit = 0 )
 meth = ini$meth
@@ -262,8 +240,6 @@ meth["female"]     <- "logreg"
 meth["race.ethnicity"]   <- "polyreg"
 meth["household.income"]      <- "polyreg"
 meth["highest.education"]  <- "polyreg"
-meth["pea_wiscv_tss"]  <- "polyreg"
-
 
 pred = ini$pred
 
@@ -371,8 +347,8 @@ pdem02 <- pdem02 %>%
          highest.education,
          household.income_num)
 
-# pdem02_family <- pdem02_family %>%
-#   select(src_subject_id, highest.education, household.income_num)
+ pdem02_family <- pdem02_family %>%
+   select(src_subject_id, highest.education, household.income_num)
 
 ```
 
@@ -403,6 +379,8 @@ sscep  <- sprintf('%s/abcd_sscep01.txt',data_dir) %>%
 sscep_family <- sscep %>%
   filter(src_subject_id %in% data.family[[1]])
 ```
+
+
 ## Youth-reported School/Family Social Environment 
 The following section includes variables corresponding to  family/school social environment, as reported by youth. This includes the following measures: School and Protective Factors Survey, Parental Monitoring, Family Conflict, Prosocial Behavior, Caregiver Acceptance, and Neighborhood Safety.
 
@@ -513,41 +491,112 @@ rhds01_family <- rhds01 %>%
 ```
 
 
-## List Sorting Cognitive Scores
-
-Relevant to PLS model 1, we will be using the List Sorting uncorrected score from the NIH Cognition Toolbox. 
-```{r ListSortingScore, echo=FALSE}
-abcd_tbss01_n <-   sprintf('%s/abcd_tbss01.txt',data_dir) %>%
-  read_tsv(n_max = 0) %>% # default: col_names = TRUE
-  names()
-abcd_tbss01 <- sprintf('%s/abcd_tbss01.txt',data_dir) %>% 
-  read_tsv(skip = 2, col_names = abcd_tbss01_n, 
-           na = c('','NA'), guess_max = 11875) %>% 
-  filter(eventname=="baseline_year_1_arm_1") %>% 
-  select(src_subject_id,
-         nihtbx_list_uncorrected)
-
-abcd_tbss01_family <- abcd_tbss01 %>%
-  filter(src_subject_id %in% data.family[[1]])
-
-```
-
-
-## Other Cognitive Scores 
+## Import and summarize cognitive scores
 
 ```{r}
 
-other_cog_scores <- read_csv("/Users/wesleymeredith/Documents/data/0_data_output/release_2.0/data.crop.update.csv") %>%
-  select(c(2,14:29))
+mysum  <- function(x)sum(x,na.rm = any(!is.na(x)))
+mymean <- function(x)mean(x,na.rm = any(!is.na(x)))
 
-colnames(other_cog_scores)[1] <- "src_subject_id"
+######### Read files #########
+NIH_toolbox  <- read.delim(paste(data_dir,"abcd_tbss01.txt",sep=""), na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>% slice(-1)
+Pearson      <- read.delim(paste(data_dir,"abcd_ps01.txt",sep=""), na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>% slice(-1)
+CashChoice   <- read.delim(paste(data_dir,"cct01.txt",sep=""), na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>% slice(-1)
+LittleMan    <- read.delim(paste(data_dir,"lmtp201.txt",sep=""), na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>% slice(-1)
 
-allwmn_wisc_scores <- other_cog_scores %>%
-  select(src_subject_id, tfmri_nb_all_beh_c2b_rate, tfmri_nb_all_beh_c0b_rate, pea_wiscv_tss)
+Nback        <- read.delim(paste(data_dir,"abcd_mrinback02.txt",sep=""), na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>% slice(-1)
+RecMem       <- read.delim(paste(data_dir,"mribrec02.txt",sep=""), na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>% slice(-1)
+SST          <- read.delim(paste(data_dir,"abcd_sst02.txt",sep=""), na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>% slice(-1)
+MID          <- read.delim(paste(data_dir,"abcd_mid02.txt",sep=""), na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>% slice(-1)
 
+######### Retain relevant variables #########
+NIH_toolbox  <- unique(subset(NIH_toolbox, select = c(subjectkey, nihtbx_picvocab_uncorrected, nihtbx_flanker_uncorrected, nihtbx_list_uncorrected, 
+                                                      nihtbx_cardsort_uncorrected, nihtbx_pattern_uncorrected, nihtbx_picture_uncorrected, nihtbx_reading_uncorrected, 
+                                                      nihtbx_fluidcomp_uncorrected, nihtbx_cryst_uncorrected, nihtbx_totalcomp_uncorrected)))
+
+Pearson      <- unique(subset(Pearson, select = c(subjectkey, pea_wiscv_tss, pea_ravlt_sd_trial_i_tc, pea_ravlt_sd_trial_ii_tc, pea_ravlt_sd_trial_iii_tc, 
+                                                  pea_ravlt_sd_trial_iv_tc, pea_ravlt_sd_trial_v_tc, pea_ravlt_sd_trial_i_tr, pea_ravlt_sd_trial_ii_tr, 
+                                                  pea_ravlt_sd_trial_iii_tr, pea_ravlt_sd_trial_iv_tr, pea_ravlt_sd_trial_v_tr, pea_ravlt_sd_trial_i_ti, 
+                                                  pea_ravlt_sd_trial_ii_ti, pea_ravlt_sd_trial_iii_ti, pea_ravlt_sd_trial_iv_ti, pea_ravlt_sd_trial_v_ti, 
+                                                  pea_ravlt_sd_listb_tc, pea_ravlt_sd_listb_tr, pea_ravlt_sd_listb_ti, pea_ravlt_sd_trial_vi_tc, pea_ravlt_sd_trial_vi_tr, 
+                                                  pea_ravlt_sd_trial_vi_ti, pea_ravlt_ld_trial_vii_tc, pea_ravlt_ld_trial_vii_tr, pea_ravlt_ld_trial_vii_ti)))
+
+CashChoice   <- unique(subset(CashChoice, select = c(subjectkey, cash_choice_task)))
+
+LittleMan    <- unique(subset(LittleMan, select = c(subjectkey, lmt_scr_efficiency, lmt_scr_perc_correct, lmt_scr_rt_correct)))
+
+Nback        <- unique(subset(Nback, select = c(subjectkey, tfmri_nback_beh_switchflag, tfmri_nback_beh_performflag, tfmri_nb_all_beh_ctotal_mrt, 
+                                                tfmri_nb_all_beh_ctotal_stdrt, tfmri_nb_all_beh_c0b_rate, tfmri_nb_all_beh_c0bnf_rate, tfmri_nb_all_beh_c0bngf_rate, 
+                                                tfmri_nb_all_beh_c0bp_rate, tfmri_nb_all_beh_c0bpf_rate, tfmri_nb_all_beh_c2b_rate, tfmri_nb_all_beh_c2bnf_rate, 
+                                                tfmri_nb_all_beh_c2bngf_rate, tfmri_nb_all_beh_c2bp_rate, tfmri_nb_all_beh_c2bpf_rate, tfmri_nb_all_beh_cnf_rate, 
+                                                tfmri_nb_all_beh_cngf_rate, tfmri_nb_all_beh_cpf_rate, tfmri_nb_all_beh_cplace_rate, tfmri_nb_all_beh_ctotal_rate)))
+
+RecMem       <- unique(subset(RecMem, select = c(subjectkey, tfmri_rec_beh_switchflag, tfmri_rec_all_beh_posface_br, tfmri_rec_all_beh_posf_dpr, 
+                                                 tfmri_rec_all_beh_neutface_br, tfmri_rec_all_beh_neutf_dp, tfmri_rec_all_beh_negface_br, tfmri_rec_all_beh_negf_dp, 
+                                                 tfmri_rec_all_beh_place_br, tfmri_rec_all_beh_place_dp)))
+
+SST          <- unique(subset(SST, select = c(subjectkey, tfmri_sst_beh_switchflag, tfmri_sst_beh_performflag, tfmri_sst_all_beh_crgo_rt, tfmri_sst_all_beh_crgo_mrt, 
+                                              tfmri_sst_all_beh_crgo_stdrt, tfmri_sst_all_beh_crlg_rt, tfmri_sst_all_beh_incrgo_rt, tfmri_sst_all_beh_incrlg_rt, 
+                                              tfmri_sst_all_beh_nrgo_rt, tfmri_sst_all_beh_crs_rt, tfmri_sst_all_beh_incrs_rt, tfmri_sst_all_beh_ssds_rt, 
+                                              tfmri_sst_all_beh_tot_mssd, tfmri_sst_all_beh_total_meanrt)))
+
+MID          <- unique(subset(MID, select = c(subjectkey, tfmri_mid_beh_switchflag, tfmri_mid_beh_performflag, tfmri_mid_all_beh_srwpfb_rate, tfmri_mid_all_beh_lrwpfb_rate, 
+                                              tfmri_mid_all_beh_slpfb_rate, tfmri_mid_all_beh_llpfb_rate, tfmri_mid_all_beh_ntpfb_rate, tfmri_mid_r1_beh_t_earnings,	
+                                              tfmri_mid_r2_beh_t_earnings, tfmri_mid_all_beh_t_earnings)))
+
+######### Convert variables to numeric #########
+NIH_toolbox[, 2:ncol(NIH_toolbox)] <- sapply(NIH_toolbox[, 2:ncol(NIH_toolbox)], as.numeric)
+Pearson[, 2:ncol(Pearson)]         <- sapply(Pearson[, 2:ncol(Pearson)], as.numeric)
+CashChoice[, 2]                    <- sapply(CashChoice[, 2], as.numeric)
+LittleMan[, 2:ncol(LittleMan)]     <- sapply(LittleMan[, 2:ncol(LittleMan)], as.numeric)
+Nback[, 4:ncol(Nback)]             <- sapply(Nback[, 4:ncol(Nback)], as.numeric)
+RecMem[, 3:ncol(RecMem)]           <- sapply(RecMem[, 3:ncol(RecMem)], as.numeric)
+SST[, 4:ncol(SST)]                 <- sapply(SST[, 4:ncol(SST)], as.numeric)
+MID[, 4:ncol(MID)]                 <- sapply(MID[, 4:ncol(MID)], as.numeric)
+
+######### Add performance measure columns #########
+Pearson$pea_ravlt_sd_trial_itov_tc <- apply(Pearson[c('pea_ravlt_sd_trial_i_tc', 'pea_ravlt_sd_trial_ii_tc', 
+                                                      'pea_ravlt_sd_trial_iii_tc', 'pea_ravlt_sd_trial_iv_tc', 'pea_ravlt_sd_trial_v_tc')], 1, mysum)
+
+Pearson$pea_ravlt_sd_trial_itov_tr <- apply(Pearson[c('pea_ravlt_sd_trial_i_tr', 'pea_ravlt_sd_trial_ii_tr', 'pea_ravlt_sd_trial_iii_tr', 
+                                                      'pea_ravlt_sd_trial_iv_tr', 'pea_ravlt_sd_trial_v_tr')], 1, mysum)
+
+Pearson$pea_ravlt_sd_trial_itov_ti <- apply(Pearson[c('pea_ravlt_sd_trial_i_ti', 'pea_ravlt_sd_trial_ii_ti', 'pea_ravlt_sd_trial_iii_ti', 
+                                                      'pea_ravlt_sd_trial_iv_ti', 'pea_ravlt_sd_trial_v_ti')], 1, mysum)
+
+Pearson$pea_ravlt_tc               <- apply(Pearson[c('pea_ravlt_sd_trial_i_tc', 'pea_ravlt_sd_trial_ii_tc', 'pea_ravlt_sd_trial_iii_tc', 
+                                                      'pea_ravlt_sd_trial_iv_tc', 'pea_ravlt_sd_trial_v_tc', 'pea_ravlt_sd_listb_tc', 
+                                                      'pea_ravlt_sd_trial_vi_tc', 'pea_ravlt_ld_trial_vii_tc')], 1, mysum)
+
+RecMem$overall_dprime              <- apply(RecMem[c('tfmri_rec_all_beh_posf_dpr', 'tfmri_rec_all_beh_neutf_dp', 'tfmri_rec_all_beh_negf_dp', 
+                                                     'tfmri_rec_all_beh_place_dp')], 1, mymean)
+
+MID$mean_earnings                  <- apply(MID[c('tfmri_mid_r1_beh_t_earnings', 'tfmri_mid_r2_beh_t_earnings')], 1, mymean)
+
+######### Invert SSRT #########
+SST$tfmri_sst_all_beh_total_meanrt <- SST$tfmri_sst_all_beh_total_meanrt*-1
+
+######### Remove cash choice option 3 ("don't know") #########
+CashChoice$cash_choice_task[CashChoice$cash_choice_task == 3] <- NA
+
+######### Merge, clean, crop data #########
+cog_merge <- Reduce(function(x,y) merge(x = x, y = y, by = "subjectkey", all.x = TRUE, all.y = TRUE), 
+                     list(NIH_toolbox, Pearson, 
+                          CashChoice, LittleMan, Nback, RecMem, SST, MID))
+
+
+cog_scores  <- subset(cog_merge, select = c(subjectkey, nihtbx_list_uncorrected, nihtbx_reading_uncorrected, nihtbx_picvocab_uncorrected, 
+                                                  tfmri_nb_all_beh_c2b_rate, pea_ravlt_sd_trial_vi_tc, pea_wiscv_tss, pea_ravlt_ld_trial_vii_tc, 
+                                                  nihtbx_picture_uncorrected, tfmri_nb_all_beh_c0b_rate, nihtbx_cardsort_uncorrected, nihtbx_flanker_uncorrected, 
+                                                  lmt_scr_efficiency, overall_dprime, nihtbx_pattern_uncorrected, mean_earnings, tfmri_sst_all_beh_total_meanrt, 
+                                                  cash_choice_task))
+
+colnames(cog_scores)[1] <- "src_subject_id"
+
+cog_scores_family <- cog_scores %>%
+  filter(src_subject_id %in% data.family[[1]])
 
 ```
-
 
 
 ## Merging it all together
@@ -556,7 +605,7 @@ In this section we merge all of the variables together
 
 ```{r mergevariables, echo=TRUE}
 
-all_measures  = list(acspsw03, pdem02, sscep, sscey, abcd_nsc01, rhds01, abcd_tbss01, other_cog_scores)
+all_measures  = list(acspsw03, pdem02, sscep, sscey, abcd_nsc01, rhds01, cog_scores)
 
 compcase1 <- acspsw03[complete.cases(acspsw03),] #11854
 compcase2 <- pdem02[complete.cases(pdem02),] #11875
@@ -564,24 +613,17 @@ compcase3 <- sscep[complete.cases(sscep),] #11178
 compcase4 <- sscey[complete.cases(sscey),] #11834 
 compcase5 <- abcd_nsc01[complete.cases(abcd_nsc01),] #11849
 compcase6 <- rhds01[complete.cases(rhds01),] #11155
-compcase7 <- abcd_tbss01[complete.cases(abcd_tbss01),] #11669
-compcase8 <- other_cog_scores[complete.cases(other_cog_scores),]
+compcase7 <- cog_scores[complete.cases(cog_scores),]
 
 combined_measures <- Reduce(function(dtf1, dtf2) merge(dtf1, dtf2, all.x = TRUE),
                             all_measures)
 
 combined_measures_complete <- combined_measures[complete.cases(combined_measures),]  #9537 
 
-# combined_meas_wisc <- combined_measures_complete %>%
-#   mutate(wisc_mat = outcome_vars$pea_wiscv_tss)
-# 
- final_subjectlist_allcog <- combined_measures_complete %>%
-   select(src_subject_id)
-# 
-# 
- write.csv(final_subjectlist_allcog, sprintf('%s/final_subjectlist_allcog.csv', data_dir_subs), row.names = FALSE)
+final_subjectlist_allcog <- combined_measures_complete %>%
+  select(src_subject_id)
  
- #write.csv(final_subjectlist_allcog, sprintf('%s/final_subjectlist_allwm_wisc.csv', data_dir_subs), row.names = FALSE)
+write.csv(final_subjectlist_allcog, sprintf('%s/final_subjectlist_allcog.csv', data_dir_subs), row.names = FALSE)
  
 ```
 
@@ -590,7 +632,7 @@ combined_measures_complete <- combined_measures[complete.cases(combined_measures
 ```{r mergevars_reducedfam}
 
 all_measures_family  = list(acspsw03_family, pdem02_family, sscep_family, sscey_family, 
-                            abcd_nsc01_family, rhds01_family, abcd_tbss01_family)
+                            abcd_nsc01_family, rhds01_family, cog_scores_family)
 
 compcase1_family <- acspsw03_family[complete.cases(acspsw03_family),] #9967
 compcase2_family <- pdem02_family[complete.cases(pdem02_family),] #9987
@@ -598,7 +640,7 @@ compcase3_family <- sscep_family[complete.cases(sscep_family),] #9398
 compcase4_family <- sscey_family[complete.cases(sscey_family),] #9949
 compcase5_family <- abcd_nsc01_family[complete.cases(abcd_nsc01_family),] #9963
 compcase6_family <- rhds01_family[complete.cases(rhds01_family),] #9443
-compcase7_family <- abcd_tbss01_family[complete.cases(abcd_tbss01_family),] #9813
+compcase7_family <- cog_scores_family[complete.cases(cog_scores_family),] #
 
 combined_measures_family <- Reduce(function(dtf1, dtf2) merge(dtf1, dtf2, all.x = TRUE),
                             all_measures_family)
@@ -610,6 +652,7 @@ combined_measures_complete_family <- combined_measures_family[complete.cases(com
 
 ##For the overall dataset, we will compute the PCA for the Crime variables, and the MACV variables
 ```{r CrimePCA, echo=TRUE,results = 'markdown'}
+
 UCRCrime <- combined_measures_complete[c("UCR_GrandTotal_log", "UCR_TotOffenses_log", "UCR_ViolCrime_log", 
                        "UCR_DrugAbuse_log", "UCR_DrugSale_log", "UCR_DrugPoss_log", "UCR_DUI_log",
                        "UCR_MJSale_log")]
@@ -623,6 +666,7 @@ fviz_pca_var(res.pca_UCR, col.var = "cos2",
 fviz_contrib(res.pca_UCR, choice = "var", axes = 1, top = 20)
 
 combined_measures_complete$Crime_PC <- res.pca_UCR$ind$coord[,1]
+
 ```
 
 
@@ -648,6 +692,7 @@ combined_measures_complete_family$Crime_PC <- res.pca_UCR_family$ind$coord[,1]
 
 
 ```{r fullcompletecases}
+
 Comb_meas_vars<- combined_measures_complete %>%
   select(interview_age,#demographics
          gender_M,
@@ -679,7 +724,12 @@ Comb_meas_vars<- combined_measures_complete %>%
          reshist_addr1_pm25,
          ProxRoads_log,
          Res_density_log,
-         Crime_PC,
+         UCR_ViolCrime_log, 
+         UCR_DrugAbuse_log, 
+         UCR_DrugSale_log, 
+         UCR_DrugPoss_log, 
+         UCR_DUI_log,
+         UCR_MJSale_log,
          reshist_addr1_adi_edu_l,
          reshist_addr1_adi_edu_h,
          reshist_addr1_adi_work_c,
@@ -745,7 +795,12 @@ colnames(Comb_meas_vars) <- c("Age",
 "PM25Exposure",
 "ProxRoads",
 "ResDensity",
-"CrimePC",
+"UCR_ViolCrime_log", 
+"UCR_DrugAbuse_log", 
+"UCR_DrugSale_log", 
+"UCR_DrugPoss_log", 
+"UCR_DUI_log",
+"UCR_MJSale_log",
 "ADI_Edu_LTHS",
 "ADI_Edu_HSDip",
 "ADI_Occ_WhiteCollar",
@@ -783,12 +838,11 @@ colnames(Comb_meas_vars) <- c("Age",
 
 write.csv(Comb_meas_vars, sprintf('%s/ABCD_EnvVars_allcog.csv',data_dir_subs), row.names = FALSE)
 
-
 ```
 
 
-
 ## gather varibles for the reduced family data set
+
 ```{r}
 Comb_meas_vars_family<- combined_measures_complete_family %>%
   select(interview_age,#demographics
@@ -821,7 +875,12 @@ Comb_meas_vars_family<- combined_measures_complete_family %>%
          reshist_addr1_pm25,
          ProxRoads_log,
          Res_density_log,
-         Crime_PC,
+         UCR_ViolCrime_log, 
+         UCR_DrugAbuse_log, 
+         UCR_DrugSale_log, 
+         UCR_DrugPoss_log, 
+         UCR_DUI_log,
+         UCR_MJSale_log,
          reshist_addr1_adi_edu_l,
          reshist_addr1_adi_edu_h,
          reshist_addr1_adi_work_c,
@@ -871,7 +930,12 @@ colnames(Comb_meas_vars_family) <- c("Age",
 "PM25Exposure",
 "ProxRoads",
 "ResDensity",
-"CrimePC",
+"UCR_ViolCrime_log", 
+"UCR_DrugAbuse_log", 
+"UCR_DrugSale_log", 
+"UCR_DrugPoss_log", 
+"UCR_DUI_log",
+"UCR_MJSale_log",
 "ADI_Edu_LTHS",
 "ADI_Edu_HSDip",
 "ADI_Occ_WhiteCollar",
@@ -893,6 +957,7 @@ colnames(Comb_meas_vars_family) <- c("Age",
 
 write.csv(Comb_meas_vars_family, sprintf('%s/ABCD_ReducedFam_EnvVars_V4.csv',data_dir_subs), row.names = FALSE)
 ```
+
 ## Regress out sociodemographic variables from set with all cog scores
 
 ```{r manyLMs}
@@ -927,7 +992,12 @@ Y <- as.matrix(Comb_meas_vars[c("EthIdentExploration",
 "PM25Exposure",
 "ProxRoads",
 "ResDensity",
-"CrimePC",
+"UCR_ViolCrime_log", 
+"UCR_DrugAbuse_log", 
+"UCR_DrugSale_log", 
+"UCR_DrugPoss_log", 
+"UCR_DUI_log",
+"UCR_MJSale_log",
 "ADI_Edu_LTHS",
 "ADI_Edu_HSDip",
 "ADI_Occ_WhiteCollar",
@@ -997,11 +1067,6 @@ write.csv(CombMeasures_allcog_resid, sprintf('%s/ABCD_Full_EnvVars_allcog_residu
 ```
 
 
-Regress out dem vars from set including fluid int
-
-
-
-
 ## Regress out demographic vars from reduced family subset
 
 ```{r}
@@ -1035,7 +1100,12 @@ Y <- as.matrix(Comb_meas_vars_family[c("EthIdentExploration",
 "PM25Exposure",
 "ProxRoads",
 "ResDensity",
-"CrimePC",
+"UCR_ViolCrime_log", 
+"UCR_DrugAbuse_log", 
+"UCR_DrugSale_log", 
+"UCR_DrugPoss_log", 
+"UCR_DUI_log",
+"UCR_MJSale_log",
 "ADI_Edu_LTHS",
 "ADI_Edu_HSDip",
 "ADI_Occ_WhiteCollar",
@@ -1071,106 +1141,6 @@ write.csv(Regress_Cog_Family, sprintf('%s/ABCD_Demographics_CogResid_ReducedFam.
 
 ```
 
-```{r CreateBuckets}
-
-CultureVars <- CombMeasures_resid[,c("EthIdentExploration",
-                                     "EthIdentCommitment",
-"FamObligation",
-"FamReferent",
-"FamSupport",
-"IndepSelfReliance",
-"Religion")]
-
-HomeEnvVars <- CombMeasures_resid[,c("FamConflict_P",
-"ParentMonitoring",
-"FamConflict_Y",
-"ParentAcceptance")]
-
-SchoolEnvVars <- CombMeasures_resid[,c("SchoolEnvironment",
-"SchoolInvolvement",
-"SchoolDisengagement")]
-
-NeighborhoodEnvVars <- CombMeasures_resid[,c("NeighSafety_P",
-"NeighSafety_Y",
-"Walkability",
-"NO2Exposure",
-"PM25Exposure",
-"ProxRoads",
-"ResDensity",
-"CrimePC",
-"ADI_Edu_LTHS",
-"ADI_Edu_HSDip",
-"ADI_Occ_WhiteCollar",
-"ADI_MedianFamInc",
-"ADI_IncDisparityIdx",
-"ADI_MedianHomeValue",
-"ADI_MedianGrossRent",
-"ADI_MedianMonthMortg",
-"ADI_PercHOwner",
-"ADI_PercUnemp",
-"ADI_PercFamPoverty",
-"ADI_PercPovBelow128",
-"ADI_PercSingle",
-"ADI_PercLogNCar",
-"ADI_PercLogNTel",
-"ADI_PercLogNPlumb",
-"ADI_PercCrowding")]
-
-
-
-PCA_All = c()
-```
-
-## create buckets for the reduced family subset
-
-```{r CreateBucketsReducedFam}
-
-CultureVars_Family <- CombMeasures_family_resid[,c("EthIdentExploration",
-                                     "EthIdentCommitment",
-"FamObligation",
-"FamReferent",
-"FamSupport",
-"IndepSelfReliance",
-"Religion")]
-
-HomeEnvVars_Family <- CombMeasures_family_resid[,c("FamConflict_P",
-"ParentMonitoring",
-"FamConflict_Y",
-"ParentAcceptance")]
-
-SchoolEnvVars_Family <- CombMeasures_family_resid[,c("SchoolEnvironment",
-"SchoolInvolvement",
-"SchoolDisengagement")]
-
-NeighborhoodEnvVars_Family <- CombMeasures_family_resid[,c("NeighSafety_P",
-"NeighSafety_Y",
-"Walkability",
-"NO2Exposure",
-"PM25Exposure",
-"ProxRoads",
-"ResDensity",
-"CrimePC",
-"ADI_Edu_LTHS",
-"ADI_Edu_HSDip",
-"ADI_Occ_WhiteCollar",
-"ADI_MedianFamInc",
-"ADI_IncDisparityIdx",
-"ADI_MedianHomeValue",
-"ADI_MedianGrossRent",
-"ADI_MedianMonthMortg",
-"ADI_PercHOwner",
-"ADI_PercUnemp",
-"ADI_PercFamPoverty",
-"ADI_PercPovBelow128",
-"ADI_PercSingle",
-"ADI_PercLogNCar",
-"ADI_PercLogNTel",
-"ADI_PercLogNPlumb",
-"ADI_PercCrowding")]
-
-PCA_Family = c()
-
-```
 
 Creating variable list and environment type data table
 
@@ -1200,7 +1170,12 @@ NeighborhoodEnvVar_list <- data.table(c("NeighSafety_P",
                          "PM25Exposure",
                          "ProxRoads",
                          "ResDensity",
-                         "CrimePC",
+                         "UCR_ViolCrime_log", 
+                         "UCR_DrugAbuse_log", 
+                         "UCR_DrugSale_log", 
+                         "UCR_DrugPoss_log", 
+                         "UCR_DUI_log",
+                         "UCR_MJSale_log",
                          "ADI_Edu_LTHS",
                          "ADI_Edu_HSDip",
                          "ADI_Occ_WhiteCollar",
@@ -1228,8 +1203,6 @@ write_csv(combined_envirovar_list, sprintf('%s/ABCD_EnvVars_combinedlist.csv',da
 ```
 
 
-
-
 ```{r ReconcileNDAandDEAPNames}
 
 subs_og <- combined_measures_complete$src_subject_id
@@ -1243,6 +1216,7 @@ write.csv(subs_all, sprintf('%s/subs_EnvVars_updated.csv', data_dir_subs), row.n
 write.csv(subs_all_family, sprintf('%s/subs_EnvVars_Family_updated.csv', data_dir_subs), row.names = FALSE)
 
 ```
+
 
 ```{r PCA All}
 res.pca_Combined <- PCA(CombMeasures_resid[,c(1:39)], scale.unit = TRUE, graph = T) #first PC is 96.29%
@@ -1269,7 +1243,6 @@ fviz_contrib(res.pca_Combined_Family, choice = "var", axes = 1, top = 20)
 
 
 ```
-
 
 
 ```{r heatmap}
