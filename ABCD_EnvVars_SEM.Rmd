@@ -17,9 +17,11 @@ tidy.opts=list(width.cutoff=40), tidy = TRUE)
 library(tidyverse)
 library(lavaan)
 library(semPlot)
+library(FactoMineR)
 library(factoextra)
 library(magrittr)
 library(FactoMineR)
+library(mediation)
 
 data_dir_subs <- "/Users/wesleymeredith/Documents/data/0_data_output/enviro_factors/enviro_output/"
 
@@ -35,8 +37,8 @@ sem_cogdata <- read_csv(paste(data_dir_subs, 'allcogvars_zscore.csv', sep = ''))
 
 #these aren't currently used, but wanted to be able to quickly label for any future visualizations if needed
 sem_sociodem_vars <- colnames(sem_cogdata)[1:8]
-sem_enviro_vars <- colnames(sem_cogdata)[9:47]
-sem_cog_vars <- colnames(sem_cogdata)[48:ncol(sem_cogdata)]
+sem_enviro_vars <- colnames(sem_cogdata)[9:52]
+sem_cog_vars <- colnames(sem_cogdata)[53:ncol(sem_cogdata)]
 
 ```
 
@@ -98,22 +100,34 @@ NeighborhoodEnvVars_allcog <- sem_cogdata[,c("NeighSafety_P",
 
 ```{r}
 
-culture_pca     <- PCA(CultureEnvVars_allcog, scale.unit = TRUE, graph = T)
+culture_pca     <- PCA(CultureEnvVars_allcog, scale.unit = TRUE, graph = TRUE)
 
-home_pca        <- PCA(HomeEnvVars_allcog, scale.unit = TRUE, graph = T)
+home_pca        <- PCA(HomeEnvVars_allcog, scale.unit = TRUE, graph = TRUE)
 
-school_pca      <- PCA(SchoolEnvVars_allcog, scale.unit = TRUE, graph = T)
+school_pca      <- PCA(SchoolEnvVars_allcog, scale.unit = TRUE, graph = TRUE)
 
-neighborhood_pca <- PCA(NeighborhoodEnvVars_allcog, scale.unit = TRUE, graph = T)
+neighborhood_pca <- PCA(NeighborhoodEnvVars_allcog, scale.unit = TRUE, graph = TRUE)
+
+sociodem_pca    <- PCA(sem_cogdata[1:8], scale.unit = TRUE, graph = TRUE)
+
+cog_pca         <- PCA(sem_cogdata[53:ncol(sem_cogdata)], scale.unit = TRUE, graph = TRUE)
 
 sem_cogdata <- sem_cogdata %>%
         mutate(culture_PC1 = culture_pca$ind$coord[,1],
                home_PC1 = home_pca$ind$coord[,1],
                school_PC1 = school_pca$ind$coord[,1],
-               neighborhood_PC1 = neighborhood_pca$ind$coord[,1])
+               neighborhood_PC1 = neighborhood_pca$ind$coord[,1],
+               sociodem_PC1 = sociodem_pca$ind$coord[,1],
+               cog_PC1 = cog_pca$ind$coord[,1])
 
 ```
 
+## Plot the weights (and direction) of PC1 for environmental categories, sociodem variables, and cognitive scores
+
+```{r}
+
+
+```
 
 
 ## Specify model with all variables (singular environment LV from all variables)
@@ -497,6 +511,14 @@ summary(sem_enviro_school, standardized = TRUE, fit.measures = TRUE)
 ```{r}
 
 summary(sem_enviro_cult, standardized = TRUE, fit.measures = TRUE)
+
+```
+
+## Try mediation package 
+
+```{r}
+
+
 
 ```
 
