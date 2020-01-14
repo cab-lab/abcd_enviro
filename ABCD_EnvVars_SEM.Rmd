@@ -22,6 +22,8 @@ library(factoextra)
 library(magrittr)
 library(FactoMineR)
 library(mediation)
+library(data.table)
+library(corrplot)
 
 data_dir_subs <- "/Users/wesleymeredith/Documents/data/0_data_output/enviro_factors/enviro_output/"
 
@@ -96,27 +98,71 @@ NeighborhoodEnvVars_allcog <- sem_cogdata[,c("NeighSafety_P",
                                              "ADI_PercCrowding")]
 ```
 
+## Plot settings
+
+```{r}
+fig1_theme1 <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
+                                       panel.grid.minor = element_blank(), 
+                                       axis.title.x = element_text(size = 14), 
+                                       axis.title.y = element_text(colour = "black", size = 14),
+                                       axis.text.x = element_text(size = 6),
+                                       axis.text.y = element_text(size = 6))
+
+fig1_theme2 <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
+                                       panel.grid.minor = element_blank(), 
+                                       axis.title.x = element_text(size = 14), 
+                                       axis.title.y = element_text(colour = "white", size = 14),
+                                       axis.text.x = element_text(size = 6),
+                                       axis.text.y = element_text(size = 6))
+
+fig1_theme3 <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
+                                       panel.grid.minor = element_blank(),
+                                       axis.title.x = element_text(colour = "white", size = 14), 
+                                       axis.title.y = element_text(colour ="white", size = 14), 
+                                       axis.text.x = element_text(colour="white"), 
+                                       axis.text.y = element_text(colour="white"))
+
+fig1_theme4 <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
+                                       panel.grid.minor = element_blank(), 
+                                       axis.title.x = element_text(size = 14), 
+                                       axis.title.y = element_text(colour = "white", size = 14),
+                                       axis.text.x = element_text(size = 10),
+                                       axis.text.y = element_blank())
+
+color_teal <- "#77AAAD"
+color_grey <- "#6E7783"
+color_red <-  "#D7191C"
+color_orange <- "#d2a273"
+color_blue <- "#2B83BA"
+color_green <- "#729c6c"
+
+```
+
+
 ## Run PCA for each environment category. Append first PC from each category to dataframe.
 
 ```{r}
 
-culture_pca     <- PCA(CultureEnvVars_allcog, scale.unit = TRUE, graph = TRUE)
+culture_pca     <- PCA(CultureEnvVars_allcog, scale.unit = TRUE, graph = FALSE)
 
-home_pca        <- PCA(HomeEnvVars_allcog, scale.unit = TRUE, graph = TRUE)
+home_pca        <- PCA(HomeEnvVars_allcog, scale.unit = TRUE, graph = FALSE)
 
-school_pca      <- PCA(SchoolEnvVars_allcog, scale.unit = TRUE, graph = TRUE)
+school_pca      <- PCA(SchoolEnvVars_allcog, scale.unit = TRUE, graph = FALSE)
 
-neighborhood_pca <- PCA(NeighborhoodEnvVars_allcog, scale.unit = TRUE, graph = TRUE)
+neighborhood_pca <- PCA(NeighborhoodEnvVars_allcog, scale.unit = TRUE, graph = FALSE)
 
-sociodem_pca    <- PCA(sem_cogdata[1:8], scale.unit = TRUE, graph = TRUE)
+allenviro_pca   <- PCA(sem_cogdata[9:52], scale.unit = TRUE, graph = FALSE)
 
-cog_pca         <- PCA(sem_cogdata[53:ncol(sem_cogdata)], scale.unit = TRUE, graph = TRUE)
+sociodem_pca    <- PCA(sem_cogdata[1:8], scale.unit = TRUE, graph = FALSE)
+
+cog_pca         <- PCA(sem_cogdata[53:69], scale.unit = TRUE, graph = FALSE)
 
 sem_cogdata <- sem_cogdata %>%
         mutate(culture_PC1 = culture_pca$ind$coord[,1],
                home_PC1 = home_pca$ind$coord[,1],
                school_PC1 = school_pca$ind$coord[,1],
                neighborhood_PC1 = neighborhood_pca$ind$coord[,1],
+               enviro_PC1 = allenviro_pca$ind$coord[,1],
                sociodem_PC1 = sociodem_pca$ind$coord[,1],
                cog_PC1 = cog_pca$ind$coord[,1])
 
@@ -125,10 +171,132 @@ sem_cogdata <- sem_cogdata %>%
 ## Plot the weights (and direction) of PC1 for environmental categories, sociodem variables, and cognitive scores
 
 ```{r}
+## Culture 
+culture_pccontrib <- data.table(Contribution = culture_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(culture_pca$var$contrib))
+
+culture_pcdirect <- data.table(Coord = culture_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(culture_pca$var$coord))
+
+negative_dir_culture <- which(culture_pcdirect$Coord < 0)
+culture_pccontrib$Contribution[negative_dir_culture] <- -1 * culture_pccontrib$Contribution[negative_dir_culture]
+
+(culture_pccontrib_plot <- culture_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_red) +
+                coord_flip() +
+                fig1_theme1 )
+
+## Home 
+home_pccontrib <- data.table(Contribution = home_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(home_pca$var$contrib))
+
+home_pcdirect <- data.table(Coord = home_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(home_pca$var$coord))
+
+negative_dir_home <- which(home_pcdirect$Coord < 0)
+home_pccontrib$Contribution[negative_dir_home] <- -1 * home_pccontrib$Contribution[negative_dir_home]
+
+(home_pccontrib_plot <- home_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_orange) +
+                coord_flip() +
+                fig1_theme1 )
+
+## school 
+school_pccontrib <- data.table(Contribution = school_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(school_pca$var$contrib))
+
+school_pcdirect <- data.table(Coord = school_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(school_pca$var$coord))
+
+negative_dir_school <- which(school_pcdirect$Coord < 0)
+school_pccontrib$Contribution[negative_dir_school] <- -1 * school_pccontrib$Contribution[negative_dir_school]
+
+(school_pccontrib_plot <- school_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_blue) +
+                coord_flip() +
+                fig1_theme1 )
+
+## neighborhood
+neighborhood_pccontrib <- data.table(Contribution = neighborhood_pca$var$contrib[,1])%>%
+        mutate(Variable = rownames(neighborhood_pca$var$contrib))
+
+neighborhood_pcdirect <- data.table(Coord = neighborhood_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(neighborhood_pca$var$coord))
+
+negative_dir_neighborhood <- which(neighborhood_pcdirect$Coord < 0)
+neighborhood_pccontrib$Contribution[negative_dir_neighborhood] <- -1 * neighborhood_pccontrib$Contribution[negative_dir_neighborhood]
+
+(neighborhood_pccontrib_plot <- neighborhood_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_green) +
+                coord_flip() +
+                fig1_theme1 )
+
+## sociodemographics
+sociodem_pccontrib <- data.table(Contribution = sociodem_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(sociodem_pca$var$contrib))
+
+sociodem_pcdirect <- data.table(Coord = sociodem_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(sociodem_pca$var$coord))
+
+negative_dir_sociodem <- which(sociodem_pcdirect$Coord < 0)
+sociodem_pccontrib$Contribution[negative_dir_sociodem] <- -1 * sociodem_pccontrib$Contribution[negative_dir_sociodem]
+
+(sociodem_pccontrib_plot <- sociodem_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_grey) +
+                coord_flip() +
+                fig1_theme1 )
+
+## cog scores 
+cog_pccontrib <- data.table(Contribution = cog_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(cog_pca$var$contrib))
+
+cog_pcdirect <- data.table(Coord = cog_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(cog_pca$var$coord))
+
+negative_dir_cog <- which(cog_pcdirect$Coord < 0)
+cog_pccontrib$Contribution[negative_dir_cog] <- -1 * cog_pccontrib$Contribution[negative_dir_cog]
+
+(cog_pccontrib_plot <- cog_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
+                coord_flip() +
+                fig1_theme1 )
+
+```
+
+# Correlations between variables (and PCs)
+
+```{r}
+variable_corr <- cor(sem_cogdata[,c(1:69)])
+diag(variable_corr) <-  0
+variable_corr_pvals <- sem_cogdata[,c(1:69)] %>%
+        cor.mtest(method = "spearman")
+
+variable_corrplot <- corrplot(variable_corr, method = 'color', type = "lower", diag = FALSE, p.mat =variable_corr_pvals$p, tl.pos = "n",
+                              insig = "label_sig", cl.pos = "b", pch.col = "black", pch.cex = .5, col = colorRampPalette(c("red", "white",
+                                                                                                         "blue"))(200))
+
+pc_corr <- cor(sem_cogdata[,c(70:75)])
+diag(pc_corr) <- 0
+
+pc_corr_pvals <- sem_cogdata[,c(70:75)] %>%
+        cor.mtest(method = "spearman")
+
+pc_corrplot <- corrplot(pc_corr, method = 'color', type = "lower", diag = FALSE, p.mat = pc_corr_pvals$p,
+                              insig = "label_sig", cl.pos = "b", pch.col = "black", pch.cex = 2, outline = TRUE, addgrid.col = "gray",
+                        cl.lim = c(-0.7, 0.7), col = colorRampPalette(c("red","white", "blue"))(200))
+
 
 
 ```
 
+
+# SEM models
 
 ## Specify model with all variables (singular environment LV from all variables)
 
@@ -514,11 +682,112 @@ summary(sem_enviro_cult, standardized = TRUE, fit.measures = TRUE)
 
 ```
 
-## Try mediation package 
+# Try mediation package 
+
+## Culture mediation
+
+```{r}
+
+cult_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = sem_cogdata)
+summary(cult_totaleffect)
+
+cult_demenviro_patha <- lm(culture_PC1 ~ sociodem_PC1, data = sem_cogdata)
+summary(cult_demenviro_patha)
+
+cult_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + culture_PC1, data = sem_cogdata)
+summary(cult_envirocog_pathb)
+
+
+culture_mediation <- mediate(cult_demenviro_patha, cult_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 1000, boot.ci.type = 'bca')
+
+summary(culture_mediation)
+
+```
+
+## neighborhood mediation
+
+```{r}
+
+neigh_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = sem_cogdata)
+summary(neigh_totaleffect)
+
+neigh_demenviro_patha <- lm(neighborhood_PC1 ~ sociodem_PC1, data = sem_cogdata)
+summary(neigh_demenviro_patha)
+
+neigh_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + neighborhood_PC1, data = sem_cogdata)
+summary(neigh_envirocog_pathb)
+
+
+neigh_mediation <- mediate(neigh_demenviro_patha, neigh_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'neighborhood_PC1',
+                             boot = TRUE, sims = 1000, boot.ci.type = 'bca')
+
+summary(neigh_mediation)
+
+```
+
+## school mediation 
 
 ```{r}
 
 
+school_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = sem_cogdata)
+summary(school_totaleffect)
+
+school_demenviro_patha <- lm(school_PC1 ~ sociodem_PC1, data = sem_cogdata)
+summary(school_demenviro_patha)
+
+school_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + school_PC1, data = sem_cogdata)
+summary(school_envirocog_pathb)
+
+
+school_mediation <- mediate(school_demenviro_patha, school_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 1000, boot.ci.type = 'bca')
+
+summary(school_mediation)
+
+```
+
+## home mediation
+
+```{r}
+
+
+home_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = sem_cogdata)
+summary(home_totaleffect)
+
+home_demenviro_patha <- lm(home_PC1 ~ sociodem_PC1, data = sem_cogdata)
+summary(home_demenviro_patha)
+
+home_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + home_PC1, data = sem_cogdata)
+summary(home_envirocog_pathb)
+
+
+home_mediation <- mediate(home_demenviro_patha, home_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'home_PC1',
+                             boot = TRUE, sims = 1000, boot.ci.type = 'bca')
+
+summary(home_mediation)
+
+```
+
+## all enviro vars together 
+
+```{r}
+
+allenv_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = sem_cogdata)
+summary(allenv_totaleffect)
+
+allenv_demenviro_patha <- lm(enviro_PC1 ~ sociodem_PC1, data = sem_cogdata)
+summary(allenv_demenviro_patha)
+
+allenv_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + enviro_PC1, data = sem_cogdata)
+summary(allenv_envirocog_pathb)
+
+
+allenv_mediation <- mediate(allenv_demenviro_patha, allenv_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'enviro_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(allenv_mediation)
 
 ```
 
