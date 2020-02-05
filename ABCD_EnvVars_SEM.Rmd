@@ -268,6 +268,24 @@ cog_pccontrib$Contribution[negative_dir_cog] <- -1 * cog_pccontrib$Contribution[
                 fig1_theme1 )
 
 ```
+## combine plots for all PC contributions
+
+```{r}
+
+(pc1_fullpop_combinedfig <- grid.arrange(culture_pccontrib_plot,
+                                     home_pccontrib_plot,
+                                     school_pccontrib_plot,
+                                     neighborhood_pccontrib_plot,
+                                     sociodem_pccontrib_plot,
+                                     cog_pccontrib_plot,
+                                     heights = c(1, 1, 1),
+                                     nrow = 3))
+
+ggsave('pc1_fullpop_combinedfig.png', pc1_fullpop_combinedfig, height = 13, width = 9)
+
+```
+
+
 
 # Correlations between variables (and PCs)
 
@@ -277,7 +295,7 @@ diag(variable_corr) <-  0
 variable_corr_pvals <- sem_cogdata[,c(1:69)] %>%
         cor.mtest(method = "spearman")
 
-variable_corrplot <- corrplot(variable_corr, method = 'color', type = "lower", diag = FALSE, p.mat =variable_corr_pvals$p, tl.pos = "n",
+variable_corrplot <- corrplot(variable_corr, method = 'color', type = "lower", diag = FALSE, p.mat =variable_corr_pvals$p, tl.cex = .5, tl.srt = 25, tl.col = "black",
                               insig = "label_sig", cl.pos = "b", pch.col = "black", pch.cex = .5, col = colorRampPalette(c("red", "white",
                                                                                                          "blue"))(200))
 
@@ -288,7 +306,7 @@ pc_corr_pvals <- sem_cogdata[,c(70:75)] %>%
         cor.mtest(method = "spearman")
 
 pc_corrplot <- corrplot(pc_corr, method = 'color', type = "lower", diag = FALSE, p.mat = pc_corr_pvals$p,
-                              insig = "label_sig", cl.pos = "b", pch.col = "black", pch.cex = 2, outline = TRUE, addgrid.col = "gray",
+                              insig = "label_sig", cl.pos = "b", pch.col = "black", pch.cex = 2, outline = TRUE, addgrid.col = "gray", tl.col = "black", tl.srt = 25,
                         cl.lim = c(-0.7, 0.7), col = colorRampPalette(c("red","white", "blue"))(200))
 
 
