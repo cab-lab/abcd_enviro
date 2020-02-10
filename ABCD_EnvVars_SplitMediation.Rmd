@@ -1,0 +1,1520 @@
+---
+title: "ABCD_EnvVars_SplitMediation"
+author: "Wesley Meredith"
+date: "1/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lavaan)
+library(semPlot)
+library(FactoMineR)
+library(factoextra)
+library(magrittr)
+library(FactoMineR)
+library(mediation)
+library(data.table)
+library(corrplot)
+
+data_dir_subs <- "/Users/wesleymeredith/Documents/data/0_data_output/enviro_factors/enviro_output/"
+
+```
+
+
+## Import site and release split groups 
+```{r}
+
+site1_vars <- read.csv(paste(data_dir_subs, 'site1_allcogvars_zscore.csv', sep = ''))
+
+site2_vars <- read.csv(paste(data_dir_subs, 'site2_allcogvars_zscore.csv', sep = ''))
+
+rel1_vars <- read.csv(paste(data_dir_subs, 'rel1_allcogvars_zscore.csv', sep = ''))
+
+rel2_vars <- read.csv((paste(data_dir_subs, 'rel2_allcogvars_zscore.csv', sep = '')))
+
+pc_theme <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
+                                       panel.grid.minor = element_blank(), 
+                                       axis.title.x = element_text(size = 14), 
+                                       axis.title.y = element_blank(),
+                                       axis.text.x = element_text(size = 12),
+                                       axis.text.y = element_text(size = 12))
+
+```
+
+## Create list of environmental variable categories, sociodem and cog vars
+```{r}
+#Culture Environment
+culture_vars <- c("EthIdentExploration", "EthIdentCommitment", "FamObligation", "FamReferent", "FamSupport", "IndepSelfReliance", "Religion")
+
+#Home Envrionment 
+home_vars <- c("FamConflict_P", "ParentMonitoring", "FamConflict_Y", "ParentAcceptance")
+
+#School Environment
+school_vars <- c("SchoolEnvironment", "SchoolInvolvement", "SchoolDisengagement")
+
+#Residential Environment
+neighborhood_vars <- c("NeighSafety_P", "NeighSafety_Y", "Walkability", "NO2Exposure", "PM25Exposure", "ProxRoads", "ResDensity", 
+                       "UCR_ViolCrime_log", "UCR_DrugAbuse_log", "UCR_DrugSale_log", "UCR_DrugPoss_log", "UCR_DUI_log", "UCR_MJSale_log", 
+                       "ADI_Edu_LTHS", "ADI_Edu_HSDip", "ADI_Occ_WhiteCollar", "ADI_MedianFamInc", "ADI_IncDisparityIdx", "ADI_MedianHomeValue", 
+                       "ADI_MedianGrossRent", "ADI_MedianMonthMortg", "ADI_PercHOwner", "ADI_PercUnemp", "ADI_PercFamPoverty", "ADI_PercPovBelow128", 
+                       "ADI_PercSingle", "ADI_PercLogNCar", "ADI_PercLogNTel", "ADI_PercLogNPlumb", "ADI_PercCrowding")
+# Sociodemographics
+sociodem_vars <- c("Age", "Male", "White", "Black", "Hispanic", "Asian", "Income", "Education")
+
+#Cognitive performance vars
+cog_vars <- c("NIH_ListSorting_Scores", "NIH_PicVocab", "NIH_Flanker", "NIH_CardSort", "NIH_PatternComp", "NIH_PicSeqMem",         
+              "NIH_Reading", "WISC_Matrix", "RAVLT_ShortDel", "RAVLT_LongDel", "LittleMan", "CashChoice", "Neuro_0back",            
+              "Neuro_2back", "Neuro_EmoRec", "Neuro_StopSig", "Neuro_MID")
+
+
+```
+
+
+## Run PCA on these group splits for cog, enviro, and sociodem 
+```{r}
+
+## Site 1 
+site1_culture_pca     <- PCA(site1_vars[culture_vars], scale.unit = TRUE, graph = TRUE)
+site1_home_pca        <- PCA(site1_vars[home_vars], scale.unit = TRUE, graph = TRUE)
+site1_school_pca      <- PCA(site1_vars[school_vars], scale.unit = TRUE, graph = TRUE)
+site1_neighborhood_pca <- PCA(site1_vars[neighborhood_vars], scale.unit = TRUE, graph = TRUE)
+site1_allenviro_pca   <- PCA(site1_vars[c(culture_vars, home_vars, school_vars, neighborhood_vars)], scale.unit = TRUE, graph = TRUE)
+site1_sociodem_pca    <- PCA(site1_vars[sociodem_vars], scale.unit = TRUE, graph = TRUE)
+site1_cog_pca         <- PCA(site1_vars[cog_vars], scale.unit = TRUE, graph = TRUE)
+
+site1_vars <- site1_vars %>%
+        mutate(culture_PC1 = site1_culture_pca$ind$coord[,1],
+               home_PC1 = site1_home_pca$ind$coord[,1],
+               school_PC1 = site1_school_pca$ind$coord[,1],
+               neighborhood_PC1 = site1_neighborhood_pca$ind$coord[,1],
+               enviro_PC1 = site1_allenviro_pca$ind$coord[,1],
+               sociodem_PC1 = site1_sociodem_pca$ind$coord[,1],
+               cog_PC1 = site1_cog_pca$ind$coord[,1])
+
+## Site 2
+site2_culture_pca     <- PCA(site2_vars[culture_vars], scale.unit = TRUE, graph = TRUE)
+site2_home_pca        <- PCA(site2_vars[home_vars], scale.unit = TRUE, graph = TRUE)
+site2_school_pca      <- PCA(site2_vars[school_vars], scale.unit = TRUE, graph = TRUE)
+site2_neighborhood_pca <- PCA(site2_vars[neighborhood_vars], scale.unit = TRUE, graph = TRUE)
+site2_allenviro_pca   <- PCA(site2_vars[c(culture_vars, home_vars, school_vars, neighborhood_vars)], scale.unit = TRUE, graph = TRUE)
+site2_sociodem_pca    <- PCA(site2_vars[sociodem_vars], scale.unit = TRUE, graph = TRUE)
+site2_cog_pca         <- PCA(site2_vars[cog_vars], scale.unit = TRUE, graph = TRUE)
+
+site2_vars <- site2_vars %>%
+        mutate(culture_PC1 = site2_culture_pca$ind$coord[,1],
+               home_PC1 = site2_home_pca$ind$coord[,1],
+               school_PC1 = site2_school_pca$ind$coord[,1],
+               neighborhood_PC1 = site2_neighborhood_pca$ind$coord[,1],
+               enviro_PC1 = site2_allenviro_pca$ind$coord[,1],
+               sociodem_PC1 = site2_sociodem_pca$ind$coord[,1],
+               cog_PC1 = site2_cog_pca$ind$coord[,1])
+
+## Release 1
+rel1_culture_pca     <- PCA(rel1_vars[culture_vars], scale.unit = TRUE, graph = TRUE)
+rel1_home_pca        <- PCA(rel1_vars[home_vars], scale.unit = TRUE, graph = TRUE)
+rel1_school_pca      <- PCA(rel1_vars[school_vars], scale.unit = TRUE, graph = TRUE)
+rel1_neighborhood_pca <- PCA(rel1_vars[neighborhood_vars], scale.unit = TRUE, graph = TRUE)
+rel1_allenviro_pca   <- PCA(rel1_vars[c(culture_vars, home_vars, school_vars, neighborhood_vars)], scale.unit = TRUE, graph = TRUE)
+rel1_sociodem_pca    <- PCA(rel1_vars[sociodem_vars], scale.unit = TRUE, graph = TRUE)
+rel1_cog_pca         <- PCA(rel1_vars[cog_vars], scale.unit = TRUE, graph = TRUE)
+
+rel1_vars <- rel1_vars %>%
+        mutate(culture_PC1 = rel1_culture_pca$ind$coord[,1],
+               home_PC1 = rel1_home_pca$ind$coord[,1],
+               school_PC1 = rel1_school_pca$ind$coord[,1],
+               neighborhood_PC1 = rel1_neighborhood_pca$ind$coord[,1],
+               enviro_PC1 = rel1_allenviro_pca$ind$coord[,1],
+               sociodem_PC1 = rel1_sociodem_pca$ind$coord[,1],
+               cog_PC1 = rel1_cog_pca$ind$coord[,1])
+
+## Release 2 
+rel2_culture_pca     <- PCA(rel2_vars[culture_vars], scale.unit = TRUE, graph = TRUE)
+rel2_home_pca        <- PCA(rel2_vars[home_vars], scale.unit = TRUE, graph = TRUE)
+rel2_school_pca      <- PCA(rel2_vars[school_vars], scale.unit = TRUE, graph = TRUE)
+rel2_neighborhood_pca <- PCA(rel2_vars[neighborhood_vars], scale.unit = TRUE, graph = TRUE)
+rel2_allenviro_pca   <- PCA(rel2_vars[c(culture_vars, home_vars, school_vars, neighborhood_vars)], scale.unit = TRUE, graph = TRUE)
+rel2_sociodem_pca    <- PCA(rel2_vars[sociodem_vars], scale.unit = TRUE, graph = TRUE)
+rel2_cog_pca         <- PCA(rel2_vars[cog_vars], scale.unit = TRUE, graph = TRUE)
+
+rel2_vars <- rel2_vars %>%
+        mutate(culture_PC1 = rel2_culture_pca$ind$coord[,1],
+               home_PC1 = rel2_home_pca$ind$coord[,1],
+               school_PC1 = rel2_school_pca$ind$coord[,1],
+               neighborhood_PC1 = rel2_neighborhood_pca$ind$coord[,1],
+               enviro_PC1 = rel2_allenviro_pca$ind$coord[,1],
+               sociodem_PC1 = rel2_sociodem_pca$ind$coord[,1],
+               cog_PC1 = rel2_cog_pca$ind$coord[,1])
+
+ 
+```
+
+## Scree plots for all the split group PCs 
+
+#Site 1 group
+```{r}
+
+fviz_screeplot(site1_culture_pca, addlabels =TRUE) +
+  ggtitle("Site 1 Culture")
+fviz_screeplot(site1_home_pca, addlabels =TRUE) +
+  ggtitle("Site 1 Home")
+fviz_screeplot(site1_school_pca, addlabels =TRUE) + 
+  ggtitle("Site 1 School")
+fviz_screeplot(site1_neighborhood_pca, addlabels =TRUE) + 
+  ggtitle("Site 1 Neighborhood")
+fviz_screeplot(site1_allenviro_pca, addlabels =TRUE) +
+  ggtitle("Sute 1 All Enviro")
+fviz_screeplot(site1_sociodem_pca, addlabels =TRUE) +
+  ggtitle("Site 1 Sociodem")
+fviz_screeplot(site1_cog_pca, addlabels =TRUE) +
+  ggtitle("Site 1 Cog")
+
+```
+
+#Site 2 group
+```{r}
+
+fviz_screeplot(site2_culture_pca, addlabels =TRUE) +
+  ggtitle("Site 2 Culture")
+fviz_screeplot(site2_home_pca, addlabels =TRUE) +
+  ggtitle("Site 2 Home")
+fviz_screeplot(site2_school_pca, addlabels =TRUE)+
+  ggtitle("Site 2 School")
+fviz_screeplot(site2_neighborhood_pca, addlabels =TRUE) +
+  ggtitle("Site 2 Neighborhood")
+fviz_screeplot(site2_allenviro_pca, addlabels =TRUE) +
+  ggtitle("Site 2 All Enviro")
+fviz_screeplot(site2_sociodem_pca, addlabels =TRUE) + 
+  ggtitle("Site 2 Sociodem")
+fviz_screeplot(site2_cog_pca, addlabels =TRUE) +
+  ggtitle("Site 2 Cog")
+
+```
+
+#Release 1 group
+```{r}
+
+fviz_screeplot(rel1_culture_pca, addlabels =TRUE) +
+  ggtitle("Release 1 Culture")
+fviz_screeplot(rel1_home_pca, addlabels =TRUE) +
+  ggtitle("Release 1 Home")
+fviz_screeplot(rel1_school_pca, addlabels =TRUE) +
+  ggtitle("Release 1 School")
+fviz_screeplot(rel1_neighborhood_pca, addlabels =TRUE) +
+  ggtitle("Release 1 Neighborhood")
+fviz_screeplot(rel1_allenviro_pca, addlabels =TRUE) + 
+  ggtitle("Release 1 All Enviro")
+fviz_screeplot(rel1_sociodem_pca, addlabels =TRUE) +
+  ggtitle("Release 1 Sociodem")
+fviz_screeplot(rel1_cog_pca, addlabels =TRUE) +
+  ggtitle("Release 1 Cog")
+
+```
+
+#Release 2 group
+```{r}
+
+fviz_screeplot(rel2_culture_pca, addlabels =TRUE) +
+  ggtitle("Release 2 Culture")
+fviz_screeplot(rel2_home_pca, addlabels =TRUE) +
+  ggtitle("Release 2 Home")
+fviz_screeplot(rel2_school_pca, addlabels =TRUE) +
+  ggtitle("Release 2 School")
+fviz_screeplot(rel2_neighborhood_pca, addlabels =TRUE) +
+  ggtitle("Release 2 Neighborhood")
+fviz_screeplot(rel2_allenviro_pca, addlabels =TRUE) +
+  ggtitle("Release 2 All Enviro")
+fviz_screeplot(rel2_sociodem_pca, addlabels =TRUE) +
+  ggtitle("Release 2 Sociodem")
+fviz_screeplot(rel2_cog_pca, addlabels =TRUE) +
+  ggtitle("Release 2 Cog")
+
+```
+
+## Visualize variable contributions for the first PC from each 
+### First Rel
+```{r}
+
+## Culture 
+rel1_culture_pccontrib <- data.table(Contribution = rel1_culture_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(rel1_culture_pca$var$contrib))
+
+rel1_culture_pcdirect <- data.table(Coord = rel1_culture_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel1_culture_pca$var$coord))
+
+rel1_negative_dir_culture <- which(rel1_culture_pcdirect$Coord < 0)
+rel1_culture_pccontrib$Contribution[rel1_negative_dir_culture] <- -1 * rel1_culture_pccontrib$Contribution[rel1_negative_dir_culture]
+
+(rel1_culture_pccontrib_plot <- rel1_culture_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_red) +
+                coord_flip() +
+                pc_theme )
+
+## Home 
+rel1_home_pccontrib <- data.table(Contribution = rel1_home_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(rel1_home_pca$var$contrib))
+
+rel1_home_pcdirect <- data.table(Coord = rel1_home_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel1_home_pca$var$coord))
+
+rel1_negative_dir_home <- which(rel1_home_pcdirect$Coord < 0)
+rel1_home_pccontrib$Contribution[rel1_negative_dir_home] <- -1 * rel1_home_pccontrib$Contribution[rel1_negative_dir_home]
+
+(rel1_home_pccontrib_plot <- rel1_home_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_orange) +
+                coord_flip() +
+                pc_theme )
+
+## school 
+rel1_school_pccontrib <- data.table(Contribution = rel1_school_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(rel1_school_pca$var$contrib))
+
+rel1_school_pcdirect <- data.table(Coord = rel1_school_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel1_school_pca$var$coord))
+
+rel1_negative_dir_school <- which(rel1_school_pcdirect$Coord < 0)
+rel1_school_pccontrib$Contribution[rel1_negative_dir_school] <- -1 * rel1_school_pccontrib$Contribution[rel1_negative_dir_school]
+
+(rel1_school_pccontrib_plot <- rel1_school_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_blue) +
+                coord_flip() +
+                pc_theme )
+
+## neighborhood
+rel1_neighborhood_pccontrib <- data.table(Contribution = rel1_neighborhood_pca$var$contrib[,1])%>%
+        mutate(Variable = rownames(rel1_neighborhood_pca$var$contrib))
+
+rel1_neighborhood_pcdirect <- data.table(Coord = rel1_neighborhood_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel1_neighborhood_pca$var$coord))
+
+rel1_negative_dir_neighborhood <- which(rel1_neighborhood_pcdirect$Coord < 0)
+rel1_neighborhood_pccontrib$Contribution[rel1_negative_dir_neighborhood] <- -1 * rel1_neighborhood_pccontrib$Contribution[rel1_negative_dir_neighborhood]
+
+(rel1_neighborhood_pccontrib_plot <- rel1_neighborhood_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_green) +
+                coord_flip() +
+                pc_theme )
+
+## all enviro
+rel1_allenviro_pccontrib <- data.table(Contribution = rel1_allenviro_pca$var$contrib[,1])%>%
+        mutate(Variable = rownames(rel1_allenviro_pca$var$contrib))
+
+rel1_allenviro_pcdirect <- data.table(Coord = rel1_allenviro_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel1_allenviro_pca$var$coord))
+
+rel1_negative_dir_allenviro <- which(rel1_allenviro_pcdirect$Coord < 0)
+rel1_allenviro_pccontrib$Contribution[rel1_negative_dir_allenviro] <- -1 * rel1_allenviro_pccontrib$Contribution[rel1_negative_dir_allenviro]
+
+(rel1_allenviro_pccontrib_plot <- rel1_allenviro_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_green) +
+                coord_flip() +
+                pc_theme )
+
+## sociodemographics
+rel1_sociodem_pccontrib <- data.table(Contribution = rel1_sociodem_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(rel1_sociodem_pca$var$contrib))
+
+rel1_sociodem_pcdirect <- data.table(Coord = rel1_sociodem_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel1_sociodem_pca$var$coord))
+
+rel1_negative_dir_sociodem <- which(rel1_sociodem_pcdirect$Coord < 0)
+rel1_sociodem_pccontrib$Contribution[rel1_negative_dir_sociodem] <- -1 * rel1_sociodem_pccontrib$Contribution[rel1_negative_dir_sociodem]
+
+(rel1_sociodem_pccontrib_plot <- rel1_sociodem_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_grey) +
+                coord_flip() +
+                pc_theme )
+
+## cog scores 
+rel1_cog_pccontrib <- data.table(Contribution = rel1_cog_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(rel1_cog_pca$var$contrib))
+
+rel1_cog_pcdirect <- data.table(Coord = rel1_cog_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel1_cog_pca$var$coord))
+
+rel1_negative_dir_cog <- which(rel1_cog_pcdirect$Coord < 0)
+rel1_cog_pccontrib$Contribution[rel1_negative_dir_cog] <- -1 * rel1_cog_pccontrib$Contribution[rel1_negative_dir_cog]
+
+(rel1_cog_pccontrib_plot <- rel1_cog_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
+                coord_flip() +
+                pc_theme )
+
+```
+
+### Second Rel
+```{r}
+
+## Culture 
+rel2_culture_pccontrib <- data.table(Contribution = rel2_culture_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(rel2_culture_pca$var$contrib))
+
+rel2_culture_pcdirect <- data.table(Coord = rel2_culture_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel2_culture_pca$var$coord))
+
+rel2_negative_dir_culture <- which(rel2_culture_pcdirect$Coord < 0)
+rel2_culture_pccontrib$Contribution[rel2_negative_dir_culture] <- -1 * rel2_culture_pccontrib$Contribution[rel2_negative_dir_culture]
+
+(rel2_culture_pccontrib_plot <- rel2_culture_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_red) +
+                coord_flip() +
+                pc_theme )
+
+## Home 
+rel2_home_pccontrib <- data.table(Contribution = rel2_home_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(rel2_home_pca$var$contrib))
+
+rel2_home_pcdirect <- data.table(Coord = rel2_home_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel2_home_pca$var$coord))
+
+rel2_negative_dir_home <- which(rel2_home_pcdirect$Coord < 0)
+rel2_home_pccontrib$Contribution[rel2_negative_dir_home] <- -1 * rel2_home_pccontrib$Contribution[rel2_negative_dir_home]
+
+(rel2_home_pccontrib_plot <- rel2_home_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_orange) +
+                coord_flip() +
+                pc_theme )
+
+## school 
+rel2_school_pccontrib <- data.table(Contribution = rel2_school_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(rel2_school_pca$var$contrib))
+
+rel2_school_pcdirect <- data.table(Coord = rel2_school_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel2_school_pca$var$coord))
+
+rel2_negative_dir_school <- which(rel2_school_pcdirect$Coord < 0)
+rel2_school_pccontrib$Contribution[rel2_negative_dir_school] <- -1 * rel2_school_pccontrib$Contribution[rel2_negative_dir_school]
+
+(rel2_school_pccontrib_plot <- rel2_school_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_blue) +
+                coord_flip() +
+                pc_theme )
+
+## neighborhood
+rel2_neighborhood_pccontrib <- data.table(Contribution = rel2_neighborhood_pca$var$contrib[,1])%>%
+        mutate(Variable = rownames(rel2_neighborhood_pca$var$contrib))
+
+rel2_neighborhood_pcdirect <- data.table(Coord = rel2_neighborhood_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel2_neighborhood_pca$var$coord))
+
+rel2_negative_dir_neighborhood <- which(rel2_neighborhood_pcdirect$Coord < 0)
+rel2_neighborhood_pccontrib$Contribution[rel2_negative_dir_neighborhood] <- -1 * rel2_neighborhood_pccontrib$Contribution[rel2_negative_dir_neighborhood]
+
+(rel2_neighborhood_pccontrib_plot <- rel2_neighborhood_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_green) +
+                coord_flip() +
+                pc_theme )
+
+## all enviro
+rel2_allenviro_pccontrib <- data.table(Contribution = rel2_allenviro_pca$var$contrib[,1])%>%
+        mutate(Variable = rownames(rel2_allenviro_pca$var$contrib))
+
+rel2_allenviro_pcdirect <- data.table(Coord = rel2_allenviro_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel2_allenviro_pca$var$coord))
+
+rel2_negative_dir_allenviro <- which(rel2_allenviro_pcdirect$Coord < 0)
+rel2_allenviro_pccontrib$Contribution[rel2_negative_dir_allenviro] <- -1 * rel2_allenviro_pccontrib$Contribution[rel2_negative_dir_allenviro]
+
+(rel2_allenviro_pccontrib_plot <- rel2_allenviro_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_green) +
+                coord_flip() +
+                pc_theme )
+
+## sociodemographics
+rel2_sociodem_pccontrib <- data.table(Contribution = rel2_sociodem_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(rel2_sociodem_pca$var$contrib))
+
+rel2_sociodem_pcdirect <- data.table(Coord = rel2_sociodem_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel2_sociodem_pca$var$coord))
+
+rel2_negative_dir_sociodem <- which(rel2_sociodem_pcdirect$Coord < 0)
+rel2_sociodem_pccontrib$Contribution[rel2_negative_dir_sociodem] <- -1 * rel2_sociodem_pccontrib$Contribution[rel2_negative_dir_sociodem]
+
+(rel2_sociodem_pccontrib_plot <- rel2_sociodem_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_grey) +
+                coord_flip() +
+                pc_theme )
+
+## cog scores 
+rel2_cog_pccontrib <- data.table(Contribution = rel2_cog_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(rel2_cog_pca$var$contrib))
+
+rel2_cog_pcdirect <- data.table(Coord = rel2_cog_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(rel2_cog_pca$var$coord))
+
+rel2_negative_dir_cog <- which(rel2_cog_pcdirect$Coord < 0)
+rel2_cog_pccontrib$Contribution[rel2_negative_dir_cog] <- -1 * rel2_cog_pccontrib$Contribution[rel2_negative_dir_cog]
+
+(rel2_cog_pccontrib_plot <- rel2_cog_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
+                coord_flip() +
+                pc_theme )
+
+```
+
+
+
+### First Site 
+```{r}
+
+## Culture 
+site1_culture_pccontrib <- data.table(Contribution = site1_culture_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(site1_culture_pca$var$contrib))
+
+site1_culture_pcdirect <- data.table(Coord = site1_culture_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site1_culture_pca$var$coord))
+
+site1_negative_dir_culture <- which(site1_culture_pcdirect$Coord < 0)
+site1_culture_pccontrib$Contribution[site1_negative_dir_culture] <- -1 * site1_culture_pccontrib$Contribution[site1_negative_dir_culture]
+
+(site1_culture_pccontrib_plot <- site1_culture_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_red) +
+                coord_flip() +
+                pc_theme )
+
+## Home 
+site1_home_pccontrib <- data.table(Contribution = site1_home_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(site1_home_pca$var$contrib))
+
+site1_home_pcdirect <- data.table(Coord = site1_home_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site1_home_pca$var$coord))
+
+site1_negative_dir_home <- which(site1_home_pcdirect$Coord < 0)
+site1_home_pccontrib$Contribution[site1_negative_dir_home] <- -1 * site1_home_pccontrib$Contribution[site1_negative_dir_home]
+
+(site1_home_pccontrib_plot <- site1_home_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_orange) +
+                coord_flip() +
+                pc_theme )
+
+## school 
+site1_school_pccontrib <- data.table(Contribution = site1_school_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(site1_school_pca$var$contrib))
+
+site1_school_pcdirect <- data.table(Coord = site1_school_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site1_school_pca$var$coord))
+
+site1_negative_dir_school <- which(site1_school_pcdirect$Coord < 0)
+site1_school_pccontrib$Contribution[site1_negative_dir_school] <- -1 * site1_school_pccontrib$Contribution[site1_negative_dir_school]
+
+(site1_school_pccontrib_plot <- site1_school_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_blue) +
+                coord_flip() +
+                pc_theme )
+
+## neighborhood
+site1_neighborhood_pccontrib <- data.table(Contribution = site1_neighborhood_pca$var$contrib[,1])%>%
+        mutate(Variable = rownames(site1_neighborhood_pca$var$contrib))
+
+site1_neighborhood_pcdirect <- data.table(Coord = site1_neighborhood_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site1_neighborhood_pca$var$coord))
+
+site1_negative_dir_neighborhood <- which(site1_neighborhood_pcdirect$Coord < 0)
+site1_neighborhood_pccontrib$Contribution[site1_negative_dir_neighborhood] <- -1 * site1_neighborhood_pccontrib$Contribution[site1_negative_dir_neighborhood]
+
+(site1_neighborhood_pccontrib_plot <- site1_neighborhood_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_green) +
+                coord_flip() +
+                pc_theme )
+
+## all enviro
+site1_allenviro_pccontrib <- data.table(Contribution = site1_allenviro_pca$var$contrib[,1])%>%
+        mutate(Variable = rownames(site1_allenviro_pca$var$contrib))
+
+site1_allenviro_pcdirect <- data.table(Coord = site1_allenviro_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site1_allenviro_pca$var$coord))
+
+site1_negative_dir_allenviro <- which(site1_allenviro_pcdirect$Coord < 0)
+site1_allenviro_pccontrib$Contribution[site1_negative_dir_allenviro] <- -1 * site1_allenviro_pccontrib$Contribution[site1_negative_dir_allenviro]
+
+(site1_allenviro_pccontrib_plot <- site1_allenviro_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_green) +
+                coord_flip() +
+                pc_theme )
+
+## sociodemographics
+site1_sociodem_pccontrib <- data.table(Contribution = site1_sociodem_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(site1_sociodem_pca$var$contrib))
+
+site1_sociodem_pcdirect <- data.table(Coord = site1_sociodem_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site1_sociodem_pca$var$coord))
+
+site1_negative_dir_sociodem <- which(site1_sociodem_pcdirect$Coord < 0)
+site1_sociodem_pccontrib$Contribution[site1_negative_dir_sociodem] <- -1 * site1_sociodem_pccontrib$Contribution[site1_negative_dir_sociodem]
+
+(site1_sociodem_pccontrib_plot <- site1_sociodem_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_grey) +
+                coord_flip() +
+                pc_theme )
+
+## cog scores 
+site1_cog_pccontrib <- data.table(Contribution = site1_cog_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(site1_cog_pca$var$contrib))
+
+site1_cog_pcdirect <- data.table(Coord = site1_cog_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site1_cog_pca$var$coord))
+
+site1_negative_dir_cog <- which(site1_cog_pcdirect$Coord < 0)
+site1_cog_pccontrib$Contribution[site1_negative_dir_cog] <- -1 * site1_cog_pccontrib$Contribution[site1_negative_dir_cog]
+
+(site1_cog_pccontrib_plot <- site1_cog_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
+                coord_flip() +
+                pc_theme )
+
+```
+
+
+
+
+### Second Site
+```{r}
+
+## Culture 
+site2_culture_pccontrib <- data.table(Contribution = site2_culture_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(site2_culture_pca$var$contrib))
+
+site2_culture_pcdirect <- data.table(Coord = site2_culture_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site2_culture_pca$var$coord))
+
+site2_negative_dir_culture <- which(site2_culture_pcdirect$Coord < 0)
+site2_culture_pccontrib$Contribution[site2_negative_dir_culture] <- -1 * site2_culture_pccontrib$Contribution[site2_negative_dir_culture]
+
+(site2_culture_pccontrib_plot <- site2_culture_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_red) +
+                coord_flip() +
+                pc_theme )
+
+## Home 
+site2_home_pccontrib <- data.table(Contribution = site2_home_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(site2_home_pca$var$contrib))
+
+site2_home_pcdirect <- data.table(Coord = site2_home_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site2_home_pca$var$coord))
+
+site2_negative_dir_home <- which(site2_home_pcdirect$Coord < 0)
+site2_home_pccontrib$Contribution[site2_negative_dir_home] <- -1 * site2_home_pccontrib$Contribution[site2_negative_dir_home]
+
+(site2_home_pccontrib_plot <- site2_home_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_orange) +
+                coord_flip() +
+                pc_theme )
+
+## school 
+site2_school_pccontrib <- data.table(Contribution = site2_school_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(site2_school_pca$var$contrib))
+
+site2_school_pcdirect <- data.table(Coord = site2_school_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site2_school_pca$var$coord))
+
+site2_negative_dir_school <- which(site2_school_pcdirect$Coord < 0)
+site2_school_pccontrib$Contribution[site2_negative_dir_school] <- -1 * site2_school_pccontrib$Contribution[site2_negative_dir_school]
+
+(site2_school_pccontrib_plot <- site2_school_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_blue) +
+                coord_flip() +
+                pc_theme )
+
+## neighborhood
+site2_neighborhood_pccontrib <- data.table(Contribution = site2_neighborhood_pca$var$contrib[,1])%>%
+        mutate(Variable = rownames(site2_neighborhood_pca$var$contrib))
+
+site2_neighborhood_pcdirect <- data.table(Coord = site2_neighborhood_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site2_neighborhood_pca$var$coord))
+
+site2_negative_dir_neighborhood <- which(site2_neighborhood_pcdirect$Coord < 0)
+site2_neighborhood_pccontrib$Contribution[site2_negative_dir_neighborhood] <- -1 * site2_neighborhood_pccontrib$Contribution[site2_negative_dir_neighborhood]
+
+(site2_neighborhood_pccontrib_plot <- site2_neighborhood_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_green) +
+                coord_flip() +
+                pc_theme )
+
+## all enviro
+site2_allenviro_pccontrib <- data.table(Contribution = site2_allenviro_pca$var$contrib[,1])%>%
+        mutate(Variable = rownames(site2_allenviro_pca$var$contrib))
+
+site2_allenviro_pcdirect <- data.table(Coord = site2_allenviro_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site2_allenviro_pca$var$coord))
+
+site2_negative_dir_allenviro <- which(site2_allenviro_pcdirect$Coord < 0)
+site2_allenviro_pccontrib$Contribution[site2_negative_dir_allenviro] <- -1 * site2_allenviro_pccontrib$Contribution[site2_negative_dir_allenviro]
+
+(site2_allenviro_pccontrib_plot <- site2_allenviro_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_green) +
+                coord_flip() +
+                pc_theme )
+
+## sociodemographics
+site2_sociodem_pccontrib <- data.table(Contribution = site2_sociodem_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(site2_sociodem_pca$var$contrib))
+
+site2_sociodem_pcdirect <- data.table(Coord = site2_sociodem_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site2_sociodem_pca$var$coord))
+
+site2_negative_dir_sociodem <- which(site2_sociodem_pcdirect$Coord < 0)
+site2_sociodem_pccontrib$Contribution[site2_negative_dir_sociodem] <- -1 * site2_sociodem_pccontrib$Contribution[site2_negative_dir_sociodem]
+
+(site2_sociodem_pccontrib_plot <- site2_sociodem_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_grey) +
+                coord_flip() +
+                pc_theme )
+
+## cog scores 
+site2_cog_pccontrib <- data.table(Contribution = site2_cog_pca$var$contrib[,1]) %>%
+        mutate(Variable = rownames(site2_cog_pca$var$contrib))
+
+site2_cog_pcdirect <- data.table(Coord = site2_cog_pca$var$coord[,1]) %>%
+        mutate(Variable = rownames(site2_cog_pca$var$coord))
+
+site2_negative_dir_cog <- which(site2_cog_pcdirect$Coord < 0)
+site2_cog_pccontrib$Contribution[site2_negative_dir_cog] <- -1 * site2_cog_pccontrib$Contribution[site2_negative_dir_cog]
+
+(site2_cog_pccontrib_plot <- site2_cog_pccontrib %>%
+                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
+                coord_flip() +
+                pc_theme )
+
+```
+
+## Comparing PCs across splits 
+```{r}
+# Home
+(releasecorr_homePC1 <- cor.test(rel1_home_pca$var$coord[,1], rel2_home_pca$var$coord[,1], method = "pearson"))
+(sitecorr_homePC1 <- cor.test(site1_home_pca$var$coord[,1], site2_home_pca$var$coord[,1], method = "pearson"))
+
+#School
+(releasecorr_schoolPC1 <- cor.test(rel1_school_pca$var$coord[,1], rel1_school_pca$var$coord[,1], method = "pearson"))
+(sitecorr_schoolPC1 <- cor.test(site1_school_pca$var$coord[,1], site2_school_pca$var$coord[,1], method = "pearson"))
+
+# Neighborhood 
+(releasecorr_neighPC1 <- cor.test(rel1_neighborhood_pca$var$coord[,1], rel2_neighborhood_pca$var$coord[,1], method = "spearman"))
+(sitecorr_neighPC1 <- cor.test(site1_neighborhood_pca$var$coord[,1], site2_neighborhood_pca$var$coord[,1], method = "spearman"))
+
+#Culture
+(releasecorr_culturePC1 <- cor.test(rel1_culture_pca$var$coord[,1], rel2_culture_pca$var$coord[,1], method = "spearman"))
+(sitecorr_culturePC1 <- cor.test(site1_culture_pca$var$coord[,1], site2_culture_pca$var$coord[,1], method = "spearman"))
+
+#Full enviro
+(releasecorr_enviroPC1 <- cor.test(rel1_allenviro_pca$var$coord[,1], rel2_allenviro_pca$var$coord[,1], method = "spearman"))
+(sitecorr_enviroPC1 <- cor.test(site1_allenviro_pca$var$coord[,1], site2_allenviro_pca$var$coord[,1], method = "spearman"))
+
+# Sociodem
+(releasecorr_sociodemPC1 <- cor.test(rel1_allenviro_pca$var$coord[,1], rel2_allenviro_pca$var$coord[,1], method = "spearman"))
+(sitecorr_sociodemPC1 <- cor.test(site1_allenviro_pca$var$coord[,1], site2_allenviro_pca$var$coord[,1], method = "spearman"))
+
+# Cog
+(releasecorr_cogPC1 <- cor.test(rel1_allenviro_pca$var$coord[,1], rel2_allenviro_pca$var$coord[,1], method = "spearman"))
+(sitecorr_cogPC1 <- cor.test(site1_allenviro_pca$var$coord[,1], site2_allenviro_pca$var$coord[,1], method = "spearman"))   
+
+```
+
+
+# Mediation
+
+## First release 
+### Home
+```{r}
+
+rel1_home_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = rel1_vars)
+summary(rel1_home_totaleffect)
+
+rel1_home_demenviro_patha <- lm(home_PC1 ~ sociodem_PC1, data = rel1_vars)
+summary(rel1_home_demenviro_patha)
+
+rel1_home_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + home_PC1, data = rel1_vars)
+summary(rel1_home_envirocog_pathb)
+
+rel1_home_mediation <- mediate(rel1_home_demenviro_patha, rel1_home_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'home_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel1_home_mediation)
+
+```
+
+### School
+```{r}
+
+rel1_school_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = rel1_vars)
+summary(rel1_school_totaleffect)
+
+rel1_school_demenviro_patha <- lm(school_PC1 ~ sociodem_PC1, data = rel1_vars)
+summary(rel1_school_demenviro_patha)
+
+rel1_school_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + school_PC1, data = rel1_vars)
+summary(rel1_school_envirocog_pathb)
+
+rel1_school_mediation <- mediate(rel1_school_demenviro_patha, rel1_school_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel1_school_mediation)
+
+```
+
+### Neighborhood
+```{r}
+
+rel1_neigh_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = rel1_vars)
+summary(rel1_neigh_totaleffect)
+
+rel1_neigh_demenviro_patha <- lm(neighborhood_PC1 ~ sociodem_PC1, data = rel1_vars)
+summary(rel1_neigh_demenviro_patha)
+
+rel1_neigh_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + neighborhood_PC1, data = rel1_vars)
+summary(rel1_neigh_envirocog_pathb)
+
+rel1_neigh_mediation <- mediate(rel1_neigh_demenviro_patha, rel1_neigh_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'neighborhood_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel1_neigh_mediation)
+
+```
+
+### Culture
+```{r}
+
+rel1_cult_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = rel1_vars)
+summary(rel1_cult_totaleffect)
+
+rel1_cult_demenviro_patha <- lm(culture_PC1 ~ sociodem_PC1, data = rel1_vars)
+summary(rel1_cult_demenviro_patha)
+
+rel1_cult_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + culture_PC1, data = rel1_vars)
+summary(rel1_cult_envirocog_pathb)
+
+rel1_culture_mediation <- mediate(rel1_cult_demenviro_patha, rel1_cult_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel1_culture_mediation)
+
+```
+
+### All Enviro
+```{r}
+
+rel1_allenv_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = rel1_vars)
+summary(rel1_allenv_totaleffect)
+
+rel1_allenv_demenviro_patha <- lm(enviro_PC1 ~ sociodem_PC1, data = rel1_vars)
+summary(rel1_allenv_demenviro_patha)
+
+rel1_allenv_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + enviro_PC1, data = rel1_vars)
+summary(rel1_allenv_envirocog_pathb)
+
+rel1_allenv_mediation <- mediate(rel1_allenv_demenviro_patha, rel1_allenv_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'enviro_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel1_allenv_mediation)
+
+```
+
+## Second release 
+### Home
+```{r}
+
+rel2_home_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = rel2_vars)
+summary(rel2_home_totaleffect)
+
+rel2_home_demenviro_patha <- lm(home_PC1 ~ sociodem_PC1, data = rel2_vars)
+summary(rel2_home_demenviro_patha)
+
+rel2_home_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + home_PC1, data = rel2_vars)
+summary(rel2_home_envirocog_pathb)
+
+rel2_home_mediation <- mediate(rel2_home_demenviro_patha, rel2_home_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'home_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel2_home_mediation)
+
+```
+
+### School
+```{r}
+
+rel2_school_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = rel2_vars)
+summary(rel2_school_totaleffect)
+
+rel2_school_demenviro_patha <- lm(school_PC1 ~ sociodem_PC1, data = rel2_vars)
+summary(rel2_school_demenviro_patha)
+
+rel2_school_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + school_PC1, data = rel2_vars)
+summary(rel2_school_envirocog_pathb)
+
+rel2_school_mediation <- mediate(rel2_school_demenviro_patha, rel2_school_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel2_school_mediation)
+
+```
+
+### Neighborhood
+```{r}
+
+rel2_neigh_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = rel2_vars)
+summary(rel2_neigh_totaleffect)
+
+rel2_neigh_demenviro_patha <- lm(neighborhood_PC1 ~ sociodem_PC1, data = rel2_vars)
+summary(rel2_neigh_demenviro_patha)
+
+rel2_neigh_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + neighborhood_PC1, data = rel2_vars)
+summary(rel2_neigh_envirocog_pathb)
+
+rel2_neigh_mediation <- mediate(rel2_neigh_demenviro_patha, rel2_neigh_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'neighborhood_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel2_neigh_mediation)
+
+```
+
+### Culture
+```{r}
+
+rel2_cult_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = rel2_vars)
+summary(rel2_cult_totaleffect)
+
+rel2_cult_demenviro_patha <- lm(culture_PC1 ~ sociodem_PC1, data = rel2_vars)
+summary(rel2_cult_demenviro_patha)
+
+rel2_cult_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + culture_PC1, data = rel2_vars)
+summary(rel2_cult_envirocog_pathb)
+
+rel2_culture_mediation <- mediate(rel2_cult_demenviro_patha, rel2_cult_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel2_culture_mediation)
+
+```
+
+### All Enviro
+```{r}
+
+rel2_allenv_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = rel2_vars)
+summary(rel2_allenv_totaleffect)
+
+rel2_allenv_demenviro_patha <- lm(enviro_PC1 ~ sociodem_PC1, data = rel2_vars)
+summary(rel2_allenv_demenviro_patha)
+
+rel2_allenv_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + enviro_PC1, data = rel2_vars)
+summary(rel2_allenv_envirocog_pathb)
+
+rel2_allenv_mediation <- mediate(rel2_allenv_demenviro_patha, rel2_allenv_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'enviro_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel2_allenv_mediation)
+
+```
+
+
+## Site Group 1 
+### Home
+```{r}
+
+site1_home_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = site1_vars)
+summary(site1_home_totaleffect)
+
+site1_home_demenviro_patha <- lm(home_PC1 ~ sociodem_PC1, data = site1_vars)
+summary(site1_home_demenviro_patha)
+
+site1_home_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + home_PC1, data = site1_vars)
+summary(site1_home_envirocog_pathb)
+
+site1_home_mediation <- mediate(site1_home_demenviro_patha, site1_home_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'home_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site1_home_mediation)
+
+```
+
+### School
+```{r}
+
+site1_school_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = site1_vars)
+summary(school_totaleffect)
+
+site1_school_demenviro_patha <- lm(school_PC1 ~ sociodem_PC1, data = site1_vars)
+summary(site1_school_demenviro_patha)
+
+site1_school_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + school_PC1, data = site1_vars)
+summary(site1_school_envirocog_pathb)
+
+site1_school_mediation <- mediate(site1_school_demenviro_patha, site1_school_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site1_school_mediation)
+
+```
+
+### Neighborhood
+```{r}
+
+site1_neigh_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = site1_vars)
+summary(site1_neigh_totaleffect)
+
+site1_neigh_demenviro_patha <- lm(neighborhood_PC1 ~ sociodem_PC1, data = site1_vars)
+summary(site1_neigh_demenviro_patha)
+
+site1_neigh_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + neighborhood_PC1, data = site1_vars)
+summary(site1_neigh_envirocog_pathb)
+
+site1_neigh_mediation <- mediate(site1_neigh_demenviro_patha, site1_neigh_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'neighborhood_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site1_neigh_mediation)
+
+```
+
+### Culture
+```{r}
+
+site1_cult_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = site1_vars)
+summary(site1_cult_totaleffect)
+
+site1_cult_demenviro_patha <- lm(culture_PC1 ~ sociodem_PC1, data = site1_vars)
+summary(site1_cult_demenviro_patha)
+
+site1_cult_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + culture_PC1, data = site1_vars)
+summary(site1_cult_envirocog_pathb)
+
+site1_culture_mediation <- mediate(site1_cult_demenviro_patha, site1_cult_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site1_culture_mediation)
+
+```
+
+### All Enviro
+```{r}
+
+site1_allenv_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = site1_vars)
+summary(site1_allenv_totaleffect)
+
+site1_allenv_demenviro_patha <- lm(enviro_PC1 ~ sociodem_PC1, data = site1_vars)
+summary(site1_allenv_demenviro_patha)
+
+site1_allenv_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + enviro_PC1, data = site1_vars)
+summary(site1_allenv_envirocog_pathb)
+
+site1_allenv_mediation <- mediate(site1_allenv_demenviro_patha, site1_allenv_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'enviro_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site1_allenv_mediation)
+
+```
+
+
+## Site group 2 
+### Home
+```{r}
+
+site2_home_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = site2_vars)
+summary(site2_home_totaleffect)
+
+site2_home_demenviro_patha <- lm(home_PC1 ~ sociodem_PC1, data = site2_vars)
+summary(site2_home_demenviro_patha)
+
+site2_home_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + home_PC1, data = site2_vars)
+summary(site2_home_envirocog_pathb)
+
+site2_home_mediation <- mediate(site2_home_demenviro_patha, site2_home_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'home_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site2_home_mediation)
+
+```
+
+### School
+```{r}
+
+site2_school_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = site2_vars)
+summary(school_totaleffect)
+
+site2_school_demenviro_patha <- lm(school_PC1 ~ sociodem_PC1, data = site2_vars)
+summary(site2_school_demenviro_patha)
+
+site2_school_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + school_PC1, data = site2_vars)
+summary(site2_school_envirocog_pathb)
+
+site2_school_mediation <- mediate(site2_school_demenviro_patha, site2_school_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site2_school_mediation)
+
+```
+
+### Neighborhood
+```{r}
+
+site2_neigh_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = site2_vars)
+summary(site2_neigh_totaleffect)
+
+site2_neigh_demenviro_patha <- lm(neighborhood_PC1 ~ sociodem_PC1, data = site2_vars)
+summary(site2_neigh_demenviro_patha)
+
+site2_neigh_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + neighborhood_PC1, data = site2_vars)
+summary(site2_neigh_envirocog_pathb)
+
+site2_neigh_mediation <- mediate(site2_neigh_demenviro_patha, site2_neigh_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'neighborhood_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site2_neigh_mediation)
+
+```
+
+### Culture
+```{r}
+
+site2_cult_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = site2_vars)
+summary(site2_cult_totaleffect)
+
+site2_cult_demenviro_patha <- lm(culture_PC1 ~ sociodem_PC1, data = site2_vars)
+summary(site2_cult_demenviro_patha)
+
+site2_cult_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + culture_PC1, data = site2_vars)
+summary(site2_cult_envirocog_pathb)
+
+site2_culture_mediation <- mediate(site2_cult_demenviro_patha, site2_cult_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site2_culture_mediation)
+
+```
+
+### All Enviro
+```{r}
+
+site2_allenv_totaleffect <- lm(cog_PC1 ~ sociodem_PC1, data = site2_vars)
+summary(site2_allenv_totaleffect)
+
+site2_allenv_demenviro_patha <- lm(enviro_PC1 ~ sociodem_PC1, data = site2_vars)
+summary(site2_allenv_demenviro_patha)
+
+site2_allenv_envirocog_pathb <- lm(cog_PC1 ~ sociodem_PC1 + enviro_PC1, data = site2_vars)
+summary(site2_allenv_envirocog_pathb)
+
+site2_allenv_mediation <- mediate(site2_allenv_demenviro_patha, site2_allenv_envirocog_pathb, treat = 'sociodem_PC1', mediator = 'enviro_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site2_allenv_mediation)
+
+```
+
+### Reverse model relationships ###
+
+
+## First release 
+### Home Reverse model
+```{r}
+
+rel1rev_home_totaleffect <- lm(cog_PC1 ~ home_PC1, data = rel1_vars)
+summary(rel1rev_home_totaleffect)
+
+rel1rev_home_demenviro_patha <- lm(sociodem_PC1 ~ home_PC1, data = rel1_vars)
+summary(rel1rev_home_demenviro_patha)
+
+rel1rev_home_envirocog_pathb <- lm(cog_PC1 ~ home_PC1 + sociodem_PC1, data = rel1_vars)
+summary(rel1rev_home_envirocog_pathb)
+
+rel1rev_home_mediation <- mediate(rel1rev_home_demenviro_patha, rel1rev_home_envirocog_pathb, treat = 'home_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel1rev_home_mediation)
+
+```
+
+### School Reverse model
+```{r}
+
+rel1rev_school_totaleffect <- lm(cog_PC1 ~ school_PC1, data = rel1_vars)
+summary(rel1rev_school_totaleffect)
+
+rel1rev_school_demenviro_patha <- lm(sociodem_PC1 ~ school_PC1, data = rel1_vars)
+summary(rel1rev_school_demenviro_patha)
+
+rel1rev_school_envirocog_pathb <- lm(cog_PC1 ~ school_PC1 + sociodem_PC1, data = rel1_vars)
+summary(rel1rev_school_envirocog_pathb)
+
+rel1rev_school_mediation <- mediate(rel1rev_school_demenviro_patha, rel1rev_school_envirocog_pathb, treat = 'school_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel1rev_school_mediation)
+
+```
+
+### Neighborhood Reverse model
+```{r}
+
+rel1rev_neigh_totaleffect <- lm(cog_PC1 ~ neighborhood_PC1, data = rel1_vars)
+summary(rel1rev_neigh_totaleffect)
+
+rel1rev_neigh_demenviro_patha <- lm(sociodem_PC1 ~ neighborhood_PC1, data = rel1_vars)
+summary(rel1rev_neigh_demenviro_patha)
+
+rel1rev_neigh_envirocog_pathb <- lm(cog_PC1 ~ neighborhood_PC1 + sociodem_PC1, data = rel1_vars)
+summary(rel1rev_neigh_envirocog_pathb)
+
+rel1rev_neigh_mediation <- mediate(rel1rev_neigh_demenviro_patha, rel1rev_neigh_envirocog_pathb, treat = 'neighborhood_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel1rev_neigh_mediation)
+
+```
+
+### Culture Reverse model
+```{r}
+
+rel1rev_cult_totaleffect <- lm(cog_PC1 ~ culture_PC1, data = rel1_vars)
+summary(rel1rev_cult_totaleffect)
+
+rel1rev_cult_demenviro_patha <- lm(sociodem_PC1 ~ culture_PC1, data = rel1_vars)
+summary(rel1rev_cult_demenviro_patha)
+
+rel1rev_cult_envirocog_pathb <- lm(cog_PC1 ~ culture_PC1 + sociodem_PC1, data = rel1_vars)
+summary(rel1rev_cult_envirocog_pathb)
+
+rel1rev_culture_mediation <- mediate(rel1rev_cult_demenviro_patha, rel1rev_cult_envirocog_pathb, treat = 'culture_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel1rev_culture_mediation)
+
+```
+
+### All Enviro Reverse model
+```{r}
+
+rel1rev_allenv_totaleffect <- lm(cog_PC1 ~ enviro_PC1, data = rel1_vars)
+summary(rel1rev_allenv_totaleffect)
+
+rel1rev_allenv_demenviro_patha <- lm(sociodem_PC1 ~ enviro_PC1, data = rel1_vars)
+summary(rel1rev_allenv_demenviro_patha)
+
+rel1rev_allenv_envirocog_pathb <- lm(cog_PC1 ~ enviro_PC1 + sociodem_PC1, data = rel1_vars)
+summary(rel1rev_allenv_envirocog_pathb)
+
+rel1rev_allenv_mediation <- mediate(rel1rev_allenv_demenviro_patha, rel1rev_allenv_envirocog_pathb, treat = 'enviro_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel1rev_allenv_mediation)
+
+```
+
+## Second release Reverse model
+### Home Reverse model
+```{r}
+
+rel2rev_home_totaleffect <- lm(cog_PC1 ~ home_PC1, data = rel2_vars)
+summary(rel2rev_home_totaleffect)
+
+rel2rev_home_demenviro_patha <- lm(sociodem_PC1 ~ home_PC1, data = rel2_vars)
+summary(rel2rev_home_demenviro_patha)
+
+rel2rev_home_envirocog_pathb <- lm(cog_PC1 ~ home_PC1 + sociodem_PC1, data = rel2_vars)
+summary(rel2rev_home_envirocog_pathb)
+
+rel2rev_home_mediation <- mediate(rel2rev_home_demenviro_patha, rel2rev_home_envirocog_pathb, treat = 'home_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel2rev_home_mediation)
+
+```
+
+### School Reverse model
+```{r}
+
+rel2rev_school_totaleffect <- lm(cog_PC1 ~ school_PC1, data = rel2_vars)
+summary(rel2rev_school_totaleffect)
+
+rel2rev_school_demenviro_patha <- lm(sociodem_PC1 ~ school_PC1, data = rel2_vars)
+summary(rel2rev_school_demenviro_patha)
+
+rel2rev_school_envirocog_pathb <- lm(cog_PC1 ~ school_PC1 + sociodem_PC1, data = rel2_vars)
+summary(rel2rev_school_envirocog_pathb)
+
+rel2rev_school_mediation <- mediate(rel2rev_school_demenviro_patha, rel2rev_school_envirocog_pathb, treat = 'school_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel2rev_school_mediation)
+
+```
+
+### Neighborhood Reverse model
+```{r}
+
+rel2rev_neigh_totaleffect <- lm(cog_PC1 ~ neighborhood_PC1, data = rel2_vars)
+summary(rel2rev_neigh_totaleffect)
+
+rel2rev_neigh_demenviro_patha <- lm(sociodem_PC1 ~ neighborhood_PC1, data = rel2_vars)
+summary(rel2rev_neigh_demenviro_patha)
+
+rel2rev_neigh_envirocog_pathb <- lm(cog_PC1 ~ neighborhood_PC1 + sociodem_PC1, data = rel2_vars)
+summary(rel2rev_neigh_envirocog_pathb)
+
+rel2rev_neigh_mediation <- mediate(rel2rev_neigh_demenviro_patha, rel2rev_neigh_envirocog_pathb, treat = 'neighborhood_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel2rev_neigh_mediation)
+
+```
+
+### Culture Reverse model 
+```{r}
+
+rel2rev_cult_totaleffect <- lm(cog_PC1 ~ culture_PC1, data = rel2_vars)
+summary(rel2rev_cult_totaleffect)
+
+rel2rev_cult_demenviro_patha <- lm(sociodem_PC1 ~ culture_PC1, data = rel2_vars)
+summary(rel2rev_cult_demenviro_patha)
+
+rel2rev_cult_envirocog_pathb <- lm(cog_PC1 ~ culture_PC1 + sociodem_PC1, data = rel2_vars)
+summary(rel2rev_cult_envirocog_pathb)
+
+rel2rev_culture_mediation <- mediate(rel2rev_cult_demenviro_patha, rel2rev_cult_envirocog_pathb, treat = 'culture_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel2rev_culture_mediation)
+
+```
+
+### All Enviro reverse model 
+```{r}
+
+rel2rev_allenv_totaleffect <- lm(cog_PC1 ~ enviro_PC1, data = rel2_vars)
+summary(rel2rev_allenv_totaleffect)
+
+rel2rev_allenv_demenviro_patha <- lm(sociodem_PC1 ~ enviro_PC1, data = rel2_vars)
+summary(rel2rev_allenv_demenviro_patha)
+
+rel2rev_allenv_envirocog_pathb <- lm(cog_PC1 ~ enviro_PC1 + sociodem_PC1, data = rel2_vars)
+summary(rel2rev_allenv_envirocog_pathb)
+
+rel2rev_allenv_mediation <- mediate(rel2rev_allenv_demenviro_patha, rel2rev_allenv_envirocog_pathb, treat = 'enviro_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(rel2rev_allenv_mediation)
+
+```
+
+
+## Site Group 1 reverse model 
+### Home reverse model 
+```{r}
+
+site1rev_home_totaleffect <- lm(cog_PC1 ~ home_PC1, data = site1_vars)
+summary(site1rev_home_totaleffect)
+
+site1rev_home_demenviro_patha <- lm(sociodem_PC1 ~ home_PC1, data = site1_vars)
+summary(site1rev_home_demenviro_patha)
+
+site1rev_home_envirocog_pathb <- lm(cog_PC1 ~ home_PC1 + sociodem_PC1, data = site1_vars)
+summary(site1rev_home_envirocog_pathb)
+
+site1rev_home_mediation <- mediate(site1rev_home_demenviro_patha, site1rev_home_envirocog_pathb, treat = 'home_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site1rev_home_mediation)
+
+```
+
+### School reverse model 
+```{r}
+
+site1rev_school_totaleffect <- lm(cog_PC1 ~ school_PC1, data = site1_vars)
+summary(school_totaleffect)
+
+site1rev_school_demenviro_patha <- lm(sociodem_PC1 ~ school_PC1, data = site1_vars)
+summary(site1rev_school_demenviro_patha)
+
+site1rev_school_envirocog_pathb <- lm(cog_PC1 ~ school_PC1 + sociodem_PC1, data = site1_vars)
+summary(site1rev_school_envirocog_pathb)
+
+site1rev_school_mediation <- mediate(site1rev_school_demenviro_patha, site1rev_school_envirocog_pathb, treat = 'school_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site1rev_school_mediation)
+
+```
+
+### Neighborhood reverse model 
+```{r}
+
+site1rev_neigh_totaleffect <- lm(cog_PC1 ~ neighborhood_PC1, data = site1_vars)
+summary(site1rev_neigh_totaleffect)
+
+site1rev_neigh_demenviro_patha <- lm(sociodem_PC1 ~ neighborhood_PC1, data = site1_vars)
+summary(site1rev_neigh_demenviro_patha)
+
+site1rev_neigh_envirocog_pathb <- lm(cog_PC1 ~ neighborhood_PC1 + sociodem_PC1, data = site1_vars)
+summary(site1rev_neigh_envirocog_pathb)
+
+site1rev_neigh_mediation <- mediate(site1rev_neigh_demenviro_patha, site1rev_neigh_envirocog_pathb, treat = 'neighborhood_PC1', 
+                                    mediator = 'sociodem_PC1', boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site1rev_neigh_mediation)
+
+```
+
+### Culture reverse model 
+```{r}
+
+site1rev_cult_totaleffect <- lm(cog_PC1 ~ culture_PC1, data = site1_vars)
+summary(site1rev_cult_totaleffect)
+
+site1rev_cult_demenviro_patha <- lm(sociodem_PC1 ~ culture_PC1, data = site1_vars)
+summary(site1rev_cult_demenviro_patha)
+
+site1rev_cult_envirocog_pathb <- lm(cog_PC1 ~ culture_PC1 + sociodem_PC1, data = site1_vars)
+summary(site1rev_cult_envirocog_pathb)
+
+site1rev_culture_mediation <- mediate(site1rev_cult_demenviro_patha, site1rev_cult_envirocog_pathb, treat = 'culture_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site1rev_culture_mediation)
+
+```
+
+### All Enviro
+```{r}
+
+site1rev_allenv_totaleffect <- lm(cog_PC1 ~ enviro_PC1, data = site1_vars)
+summary(site1rev_allenv_totaleffect)
+
+site1rev_allenv_demenviro_patha <- lm(sociodem_PC1 ~ enviro_PC1, data = site1_vars)
+summary(site1rev_allenv_demenviro_patha)
+
+site1rev_allenv_envirocog_pathb <- lm(cog_PC1 ~ enviro_PC1 + sociodem_PC1, data = site1_vars)
+summary(site1rev_allenv_envirocog_pathb)
+
+site1rev_allenv_mediation <- mediate(site1rev_allenv_demenviro_patha, site1rev_allenv_envirocog_pathb, treat = 'enviro_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site1rev_allenv_mediation)
+
+```
+
+
+## Site group 2 reverse model 
+### Home reverse model 
+```{r}
+
+site2rev_home_totaleffect <- lm(cog_PC1 ~ home_PC1, data = site2_vars)
+summary(site2rev_home_totaleffect)
+
+site2rev_home_demenviro_patha <- lm(sociodem_PC1 ~ home_PC1, data = site2_vars)
+summary(site2rev_home_demenviro_patha)
+
+site2rev_home_envirocog_pathb <- lm(cog_PC1 ~ home_PC1 + sociodem_PC1, data = site2_vars)
+summary(site2rev_home_envirocog_pathb)
+
+site2rev_home_mediation <- mediate(site2rev_home_demenviro_patha, site2rev_home_envirocog_pathb, treat = 'home_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site2rev_home_mediation)
+
+```
+
+### School reverse model 
+```{r}
+
+site2rev_school_totaleffect <- lm(cog_PC1 ~ school_PC1, data = site2_vars)
+summary(site2rev_school_totaleffect)
+
+site2rev_school_demenviro_patha <- lm(sociodem_PC1 ~ school_PC1, data = site2_vars)
+summary(site2rev_school_demenviro_patha)
+
+site2rev_school_envirocog_pathb <- lm(cog_PC1 ~ school_PC1 + sociodem_PC1, data = site2_vars)
+summary(site2rev_school_envirocog_pathb)
+
+site2rev_school_mediation <- mediate(site2rev_school_demenviro_patha, site2rev_school_envirocog_pathb, treat = 'school_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site2rev_school_mediation)
+
+```
+
+### Neighborhood reverse model 
+```{r}
+
+site2rev_neigh_totaleffect <- lm(cog_PC1 ~ neighborhood_PC1, data = site2_vars)
+summary(site2rev_neigh_totaleffect)
+
+site2rev_neigh_demenviro_patha <- lm(sociodem_PC1 ~ neighborhood_PC1, data = site2_vars)
+summary(site2rev_neigh_demenviro_patha)
+
+site2rev_neigh_envirocog_pathb <- lm(cog_PC1 ~ neighborhood_PC1 + sociodem_PC1, data = site2_vars)
+summary(site2rev_neigh_envirocog_pathb)
+
+site2rev_neigh_mediation <- mediate(site2rev_neigh_demenviro_patha, site2rev_neigh_envirocog_pathb, treat = 'neighborhood_PC1', 
+                                    mediator = 'sociodem_PC1', boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site2rev_neigh_mediation)
+
+```
+
+### Culture reverse model 
+```{r}
+
+site2rev_cult_totaleffect <- lm(cog_PC1 ~ culture_PC1, data = site2_vars)
+summary(site2rev_cult_totaleffect)
+
+site2rev_cult_demenviro_patha <- lm(sociodem_PC1 ~ culture_PC1, data = site2_vars)
+summary(site2rev_cult_demenviro_patha)
+
+site2rev_cult_envirocog_pathb <- lm(cog_PC1 ~ culture_PC1 + sociodem_PC1, data = site2_vars)
+summary(site2rev_cult_envirocog_pathb)
+
+site2rev_culture_mediation <- mediate(site2rev_cult_demenviro_patha, site2rev_cult_envirocog_pathb, treat = 'culture_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site2rev_culture_mediation)
+
+```
+
+### All Enviro reverse model 
+```{r}
+
+site2rev_allenv_totaleffect <- lm(cog_PC1 ~ enviro_PC1, data = site2_vars)
+summary(site2rev_allenv_totaleffect)
+
+site2rev_allenv_demenviro_patha <- lm(sociodem_PC1 ~ enviro_PC1, data = site2_vars)
+summary(site2rev_allenv_demenviro_patha)
+
+site2rev_allenv_envirocog_pathb <- lm(cog_PC1 ~ enviro_PC1 + sociodem_PC1, data = site2_vars)
+summary(site2rev_allenv_envirocog_pathb)
+
+site2rev_allenv_mediation <- mediate(site2rev_allenv_demenviro_patha, site2rev_allenv_envirocog_pathb, treat = 'enviro_PC1', mediator = 'sociodem_PC1',
+                             boot = TRUE, sims = 10000, boot.ci.type = 'bca')
+
+summary(site2rev_allenv_mediation)
+
+```
+
+
