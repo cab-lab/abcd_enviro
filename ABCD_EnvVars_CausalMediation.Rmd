@@ -338,6 +338,7 @@ colnames(abcd_data_final) <- c("subject_id",
 nmissing_abcd_data_final <- colSums(is.na(abcd_data_final))
 
 abcd_data_final <- abcd_data_final[complete.cases(abcd_data_final),]
+
 ```
 
 
@@ -447,9 +448,17 @@ first_release_data <- abcd_data_final %>%
   filter(subject_id %in% first_release_subjects[[1]]) %>%
   standardize()
 
+first_release_bppca <- abcd_data_final %>%
+  filter(subject_id %in% first_release_subjects[[1]]) %>%
+  dplyr::select(Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem)
+
 second_release_data <- abcd_data_final %>%
   filter(subject_id %nin% first_release_subjects[[1]]) %>%
   standardize()
+
+second_release_bppca <- abcd_data_final %>%
+  filter(subject_id %nin% first_release_subjects[[1]]) %>%
+  dplyr::select(Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem)
 
 ```
 
@@ -475,7 +484,10 @@ full_sample_data <- full_sample_data %>%
                sociodemo_PC1 = full_sociodemo_pca$ind$coord[,1],
                neurocog_PC1 = full_neurocog_pca$ind$coord[,1],
                neurocog_PC2 = full_neurocog_pca$ind$coord[,2],
-               neurocog_PC3 = full_neurocog_pca$ind$coord[,3])
+               neurocog_PC3 = full_neurocog_pca$ind$coord[,3],
+               Neurocog_BPPC1_GenAbility = abcd_data_final$Neurocog_BPPC1_GenAbility,
+               Neurocog_BPPC2_ExecFunc = abcd_data_final$Neurocog_BPPC2_ExecFunc,
+               Neurocog_BPPC3_LearnMem = abcd_data_final$Neurocog_BPPC3_LearnMem)
 
 write_csv(full_sample_data,
           "/Users/wesleymeredith/Documents/github_repos/shared_abcd_enviro/abcd_enviro/enviro_output/abcd_enviro_fullsample.csv")
@@ -504,7 +516,10 @@ first_release_data <- first_release_data %>%
                sociodemo_PC1 = rel1_sociodemo_pca$ind$coord[,1],
                neurocog_PC1 = rel1_neurocog_pca$ind$coord[,1],
                neurocog_PC2 = rel1_neurocog_pca$ind$coord[,2],
-               neurocog_PC3 = rel1_neurocog_pca$ind$coord[,3])
+               neurocog_PC3 = rel1_neurocog_pca$ind$coord[,3], 
+               Neurocog_BPPC1_GenAbility = first_release_bppca$Neurocog_BPPC1_GenAbility,
+               Neurocog_BPPC2_ExecFunc = first_release_bppca$Neurocog_BPPC2_ExecFunc,
+               Neurocog_BPPC3_LearnMem = first_release_bppca$Neurocog_BPPC3_LearnMem)
 
 write_csv(first_release_data,
           "/Users/wesleymeredith/Documents/github_repos/shared_abcd_enviro/abcd_enviro/enviro_output/abcd_enviro_firstrelease.csv")
@@ -526,7 +541,10 @@ second_release_data <- second_release_data %>%
                sociodemo_PC1 = rel2_sociodemo_pca$ind$coord[,1],
                neurocog_PC1 = rel2_neurocog_pca$ind$coord[,1],
                neurocog_PC2 = rel2_neurocog_pca$ind$coord[,2],
-               neurocog_PC3 = rel2_neurocog_pca$ind$coord[,3])
+               neurocog_PC3 = rel2_neurocog_pca$ind$coord[,3],
+               Neurocog_BPPC1_GenAbility = second_release_bppca$Neurocog_BPPC1_GenAbility,
+               Neurocog_BPPC2_ExecFunc = second_release_bppca$Neurocog_BPPC2_ExecFunc,
+               Neurocog_BPPC3_LearnMem = second_release_bppca$Neurocog_BPPC3_LearnMem)
 
 write_csv(second_release_data,
           "/Users/wesleymeredith/Documents/github_repos/shared_abcd_enviro/abcd_enviro/enviro_output/abcd_enviro_secondrelease.csv")
@@ -800,7 +818,6 @@ summary(full3_neighborhood_mediation)
 
 ### Release 1.1 Home Environment and BPPCA 1 
 ```{r}
-
 firstrel1_home_totaleffect <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel1_home_totaleffect)
 
@@ -820,7 +837,6 @@ summary(firstrel1_home_mediation)
 
 ### Release 1.1 Home Environment and BPPCA 2
 ```{r}
-
 firstrel2_home_totaleffect <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel2_home_totaleffect)
 
@@ -840,8 +856,6 @@ summary(firstrel2_home_mediation)
 
 ### Release 1.1 Home Environment and BPPCA 3 
 ```{r}
-
-# home neurocog dim 3 
 firstrel3_home_totaleffect <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel3_home_totaleffect)
 
@@ -861,7 +875,6 @@ summary(firstrel3_home_mediation)
 
 ### Release 1.1 School Environment and BPPCA 1
 ```{r}
-# school neurocog dim 1 
 firstrel1_school_totaleffect <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel1_school_totaleffect)
 
@@ -881,7 +894,6 @@ summary(firstrel1_school_mediation)
 
 ### Release 1.1 School Environment and BPPCA 2
 ```{r}
-# school neurocog dim 2 
 firstrel2_school_totaleffect <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel2_school_totaleffect)
 
@@ -900,7 +912,6 @@ summary(firstrel2_school_mediation)
 
 ### Release 1.1 School Environment and BPPCA 3
 ```{r}
-# school neurocog dim 3 
 firstrel3_school_totaleffect <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel3_school_totaleffect)
 
@@ -919,7 +930,6 @@ summary(firstrel3_school_mediation)
 
 ### Release 1.1 Neighborhood Environment and BPPCA 1
 ```{r}
-# neighborhood neurocog dim 1 
 firstrel1_neighborhood_totaleffect <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel1_neighborhood_totaleffect)
 
@@ -934,14 +944,11 @@ firstrel1_neighborhood_mediation <- mediate(firstrel1_neighborhood_demenviro_pat
 
 summary(firstrel1_neighborhood_mediation)
 
-
 ```
 
 
 ### Release 1.1 Neighborhood Environment and BPPCA 2
 ```{r}
-
-# neighborhood neurocog dim 2
 firstrel2_neighborhood_totaleffect <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel2_neighborhood_totaleffect)
 
@@ -961,7 +968,6 @@ summary(firstrel2_neighborhood_mediation)
 
 ### Release 1.1 Neighborhood Environment and BPPCA 3
 ```{r}
-# neighborhood neurocog dim 3
 firstrel3_neighborhood_totaleffect <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel3_neighborhood_totaleffect)
 
@@ -975,13 +981,12 @@ firstrel3_neighborhood_mediation <- mediate(firstrel3_neighborhood_demenviro_pat
                                         treat = 'sociodemo_PC1', mediator = 'neighborhood_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
 
 summary(firstrel3_neighborhood_mediation)
+
 ```
 
 
 ### Release 1.1 Culture Environment and BPPCA 1
 ```{r}
-
-# culture neurocog dim 1 
 firstrel1_culture_totaleffect <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel1_culture_totaleffect)
 
@@ -1001,7 +1006,6 @@ summary(firstrel1_culture_mediation)
 
 ### Release 1.1 Culture Environment and BPPCA 2
 ```{r}
-# culture neurocog dim 2
 firstrel2_culture_totaleffect <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel2_culture_totaleffect)
 
@@ -1021,7 +1025,6 @@ summary(firstrel2_culture_mediation)
 
 ### Release 1.1 Culture Environment and BPPCA 3
 ```{r}
-# culture neurocog dim 3
 firstrel3_culture_totaleffect <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1, data = first_release_data)
 summary(firstrel3_culture_totaleffect)
 
@@ -1035,6 +1038,7 @@ firstrel3_culture_mediation <- mediate(firstrel3_culture_demenviro_patha, firstr
                              boot = TRUE, sims = 5000, boot.ci.type = 'bca')
 
 summary(firstrel3_culture_mediation)
+
 ```
 
 ## Release 2.0.1 Mediation 
@@ -1080,86 +1084,387 @@ summary(secondrel2_home_mediation)
 secondrel3_home_totaleffect <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1, data = second_release_data)
 summary(secondrel3_home_totaleffect)
 
-full3_home_demenviro_patha <- lm(home_PC1 ~ sociodemo_PC1, data = second_release_data)
-summary(full3_home_demenviro_patha)
+secondrel3_home_demenviro_patha <- lm(home_PC1 ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel3_home_demenviro_patha)
 
-full3_home_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + home_PC1, data = second_release_data)
-summary(full3_home_envirocog_pathb)
+secondrel3_home_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + home_PC1, data = second_release_data)
+summary(secondrel3_home_envirocog_pathb)
 
-full3_home_mediation <- mediate(full3_home_demenviro_patha, full3_home_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'home_PC1',
+secondrel3_home_mediation <- mediate(secondrel3_home_demenviro_patha, secondrel3_home_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'home_PC1',
                              boot = TRUE, sims = 5000, boot.ci.type = 'bca')
 
-summary(full3_home_mediation)
+summary(secondrel3_home_mediation)
 ```
 
 
 ### Release 2.0.1 School Environment and BPPCA 1
+```{r}
+secondrel1_school_totaleffect <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel1_school_totaleffect)
+
+secondrel1_school_demenviro_patha <- lm(school_PC1 ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel1_school_demenviro_patha)
+
+secondrel1_school_envirocog_pathb <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1 + school_PC1, data = second_release_data)
+summary(secondrel1_school_envirocog_pathb)
+
+secondrel1_school_mediation <- mediate(secondrel1_school_demenviro_patha, secondrel1_school_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+
+summary(secondrel1_school_mediation)
+
+```
+
 
 ### Release 2.0.1 School Environment and BPPCA 2
+```{r}
+secondrel2_school_totaleffect <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel2_school_totaleffect)
+
+secondrel2_school_demenviro_patha <- lm(school_PC1 ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel2_school_demenviro_patha)
+
+secondrel2_school_envirocog_pathb <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1 + school_PC1, data = second_release_data)
+summary(secondrel2_school_envirocog_pathb)
+
+secondrel2_school_mediation <- mediate(secondrel2_school_demenviro_patha, secondrel2_school_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+
+summary(secondrel2_school_mediation)
+```
+
 
 ### Release 2.0.1 School Environment and BPPCA 3
+```{r}
+secondrel3_school_totaleffect <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel3_school_totaleffect)
+
+secondrel3_school_demenviro_patha <- lm(school_PC1 ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel3_school_demenviro_patha)
+
+secondrel3_school_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + school_PC1, data = second_release_data)
+summary(secondrel3_school_envirocog_pathb)
+
+secondrel3_school_mediation <- mediate(secondrel3_school_demenviro_patha, secondrel3_school_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+
+summary(secondrel3_school_mediation)
+
+```
+
 
 ### Release 2.0.1 Neighborhood Environment and BPPCA 1
+```{r}
+secondrel1_neighborhood_totaleffect <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel1_neighborhood_totaleffect)
+
+secondrel1_neighborhood_demenviro_patha <- lm(neighborhood_PC1 ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel1_neighborhood_demenviro_patha)
+
+secondrel1_neighborhood_envirocog_pathb <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1 + neighborhood_PC1, data = second_release_data)
+summary(secondrel1_neighborhood_envirocog_pathb)
+
+secondrel1_neighborhood_mediation <- mediate(secondrel1_neighborhood_demenviro_patha, secondrel1_neighborhood_envirocog_pathb, 
+                                            treat = 'sociodemo_PC1', mediator = 'neighborhood_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+
+summary(secondrel1_neighborhood_mediation)
+```
+
 
 ### Release 2.0.1 Neighborhood Environment and BPPCA 2
+```{r}
+secondrel2_neighborhood_totaleffect <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel2_neighborhood_totaleffect)
+
+secondrel2_neighborhood_demenviro_patha <- lm(neighborhood_PC1 ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel2_neighborhood_demenviro_patha)
+
+secondrel2_neighborhood_envirocog_pathb <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1 + neighborhood_PC1, data = second_release_data)
+summary(secondrel2_neighborhood_envirocog_pathb)
+
+secondrel2_neighborhood_mediation <- mediate(secondrel2_neighborhood_demenviro_patha, secondrel2_neighborhood_envirocog_pathb, 
+                                            treat = 'sociodemo_PC1', mediator = 'neighborhood_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+
+summary(secondrel2_neighborhood_mediation)
+
+```
+
 
 ### Release 2.0.1 Neighborhood Environment and BPPCA 3
+```{r}
+secondrel3_neighborhood_totaleffect <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel3_neighborhood_totaleffect)
+
+secondrel3_neighborhood_demenviro_patha <- lm(neighborhood_PC1 ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel3_neighborhood_demenviro_patha)
+
+secondrel3_neighborhood_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + neighborhood_PC1, data = second_release_data)
+summary(secondrel3_neighborhood_envirocog_pathb)
+
+secondrel3_neighborhood_mediation <- mediate(secondrel3_neighborhood_demenviro_patha, secondrel3_neighborhood_envirocog_pathb, 
+                                        treat = 'sociodemo_PC1', mediator = 'neighborhood_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+
+summary(secondrel3_neighborhood_mediation)
+
+```
+
 
 ### Release 2.0.1 Culture Environment and BPPCA 1
+```{r}
+secondrel1_culture_totaleffect <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel1_culture_totaleffect)
+
+secondrel1_culture_demenviro_patha <- lm(culture_PC1 ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel1_culture_demenviro_patha)
+
+secondrel1_culture_envirocog_pathb <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1 + culture_PC1, data = second_release_data)
+summary(secondrel1_culture_envirocog_pathb)
+
+secondrel1_culture_mediation <- mediate(secondrel1_culture_demenviro_patha, secondrel1_culture_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+
+summary(secondrel1_culture_mediation)
+```
+
 
 ### Release 2.0.1 Culture Environment and BPPCA 2
+```{r}
+secondrel2_culture_totaleffect <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel2_culture_totaleffect)
+
+secondrel2_culture_demenviro_patha <- lm(culture_PC1 ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel2_culture_demenviro_patha)
+
+secondrel2_culture_envirocog_pathb <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1 + culture_PC1, data = second_release_data)
+summary(secondrel2_culture_envirocog_pathb)
+
+secondrel2_culture_mediation <- mediate(secondrel2_culture_demenviro_patha, secondrel2_culture_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+
+summary(secondrel2_culture_mediation)
+```
+
 
 ### Release 2.0.1 Culture Environment and BPPCA 3
+```{r}
+secondrel3_culture_totaleffect <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel3_culture_totaleffect)
+
+secondrel3_culture_demenviro_patha <- lm(culture_PC1 ~ sociodemo_PC1, data = second_release_data)
+summary(secondrel3_culture_demenviro_patha)
+
+secondrel3_culture_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + culture_PC1, data = second_release_data)
+summary(secondrel3_culture_envirocog_pathb)
+
+firstrel3_culture_mediation <- mediate(secondrel3_culture_demenviro_patha, secondrel3_culture_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+
+summary(firstrel3_culture_mediation)
+```
+
 
 ## Site Split 1 mediation
 
-### Site Split 1 Home Environment and BPPCA 1 
+```{r message=false, warning=FALSE, results='hide'}
+#Site one empty lists
+site1pc1_home_mediation <- vector("list", nrand)
+site1pc1_school_mediation <- vector("list", nrand)
+site1pc1_neighborhood_mediation <- vector("list", nrand)
+site1pc1_culture_mediation <- vector("list", nrand)
 
-### Site Split 1 Home Environment and BPPCA 2 
+site1pc2_home_mediation <- vector("list", nrand)
+site1pc2_school_mediation <- vector("list", nrand)
+site1pc2_neighborhood_mediation <- vector("list", nrand)
+site1pc2_culture_mediation <- vector("list", nrand)
 
-### Site Split 1 Home Environment and BPPCA 3 
+site1pc3_home_mediation <- vector("list", nrand)
+site1pc3_school_mediation <- vector("list", nrand)
+site1pc3_neighborhood_mediation <- vector("list", nrand)
+site1pc3_culture_mediation <- vector("list", nrand)
 
-### Site Split 1 School Environment and BPPCA 1
+#Site 2 empty lists
+site2pc1_home_mediation <- vector("list", nrand)
+site2pc1_school_mediation <- vector("list", nrand)
+site2pc1_neighborhood_mediation <- vector("list", nrand)
+site2pc1_culture_mediation <- vector("list", nrand)
 
-### Site Split 1 School Environment and BPPCA 2
+site2pc2_home_mediation <- vector("list", nrand)
+site2pc2_school_mediation <- vector("list", nrand)
+site2pc2_neighborhood_mediation <- vector("list", nrand)
+site2pc2_culture_mediation <- vector("list", nrand)
 
-### Site Split 1 School Environment and BPPCA 3
+site2pc3_home_mediation <- vector("list", nrand)
+site2pc3_school_mediation <- vector("list", nrand)
+site2pc3_neighborhood_mediation <- vector("list", nrand)
+site2pc3_culture_mediation <- vector("list", nrand)
 
-### Site Split 1 Neighborhood Environment and BPPCA 1
+for (i in 1:nrand){
+#### Site Group 1 Mediations ####  
+    site1_data <- abcd_data_final %>%
+    filter(abcd_site %in% site_splits_rand[,i]) %>%
+    mutate(culture_PC1 = site1_culture_PC_list[[i]]$ind$coord[,1],
+               home_PC1 = site1_home_PC_list[[i]]$ind$coord[,1],
+               school_PC1 = site1_school_PC_list[[i]]$ind$coord[,1],
+               neighborhood_PC1 = site1_neighborhood_PC_list[[i]]$ind$coord[,1],
+               sociodemo_PC1 = site1_sociodemo_PC_list[[i]]$ind$coord[,1],
+               neurocog_PC1 = site1_neurocog_PC_list[[i]]$ind$coord[,1],
+               neurocog_PC2 = site1_neurocog_PC_list[[i]]$ind$coord[,2],
+               neurocog_PC3 = site1_neurocog_PC_list[[i]]$ind$coord[,3])
+    
+#Site group 1: school neurocog dim 1 
+site1pc1_school_demenviro_patha <- lm(school_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc1_school_envirocog_pathb <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1 + school_PC1, data = site1_data)
+site1pc1_school_mediation[[i]] <- mediate(site1pc1_school_demenviro_patha, site1pc1_school_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'school_PC1',
+                                          boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 1: school neurocog dim 2 
+site1pc2_school_demenviro_patha <- lm(school_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc2_school_envirocog_pathb <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1 + school_PC1, data = site1_data)
+site1pc2_school_mediation[[i]] <- mediate(site1pc2_school_demenviro_patha, site1pc2_school_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 1: school neurocog dim 3 
+site1pc3_school_demenviro_patha <- lm(school_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc3_school_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + school_PC1, data = site1_data)
+site1pc3_school_mediation[[i]] <- mediate(site1pc3_school_demenviro_patha, site1pc3_school_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 1: home neurocog dim 1 
+site1pc1_home_demenviro_patha <- lm(home_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc1_home_envirocog_pathb <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1 + home_PC1, data = site1_data)
+site1pc1_home_mediation[[1]] <- mediate(site1pc1_home_demenviro_patha, site1pc1_home_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'home_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 1: home neurocog dim 2 
+site1pc2_home_demenviro_patha <- lm(home_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc2_home_envirocog_pathb <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1 + home_PC1, data = site1_data)
+site1pc2_home_mediation[[i]] <- mediate(site1pc2_home_demenviro_patha, site1pc2_home_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'home_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 1: home neurocog dim 3 
+site1pc3_home_demenviro_patha <- lm(home_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc3_home_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + home_PC1, data = site1_data)
+site1pc3_home_mediation[[i]] <- mediate(site1pc3_home_demenviro_patha, site1pc3_home_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'home_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 1: culture neurocog dim 1 
+site1pc1_culture_demenviro_patha <- lm(culture_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc1_culture_envirocog_pathb <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1 + culture_PC1, data = site1_data)
+site1pc1_culture_mediation[[i]] <- mediate(site1pc1_culture_demenviro_patha, site1pc1_culture_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 1: culture neurocog dim 2
+site1pc2_culture_demenviro_patha <- lm(culture_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc2_culture_envirocog_pathb <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1 + culture_PC1, data = site1_data)
+site1pc2_culture_mediation[[i]] <- mediate(site1pc2_culture_demenviro_patha, site1pc2_culture_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 1: culture neurocog dim 3
+site1pc3_culture_demenviro_patha <- lm(culture_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc3_culture_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + culture_PC1, data = site1_data)
+site1pc3_culture_mediation[[i]] <- mediate(site1pc3_culture_demenviro_patha, site1pc3_culture_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 1: neighborhood neurocog dim 1 
+site1pc1_neighborhood_demenviro_patha <- lm(neighborhood_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc1_neighborhood_envirocog_pathb <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1 + neighborhood_PC1, data = site1_data)
+site1pc1_neighborhood_mediation[[i]] <- mediate(site1pc1_neighborhood_demenviro_patha, site1pc1_neighborhood_envirocog_pathb, treat = 'sociodemo_PC1', 
+                                                mediator = 'neighborhood_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 1: neighborhood neurocog dim 2
+site1pc2_neighborhood_demenviro_patha <- lm(neighborhood_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc2_neighborhood_envirocog_pathb <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1 + neighborhood_PC1, data = site1_data)
+site1pc2_neighborhood_mediation[[i]] <- mediate(site1pc2_neighborhood_demenviro_patha, site1pc2_neighborhood_envirocog_pathb, treat = 'sociodemo_PC1', 
+                                        mediator = 'neighborhood_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 1: neighborhood neurocog dim 3
+site1pc3_neighborhood_demenviro_patha <- lm(neighborhood_PC1 ~ sociodemo_PC1, data = site1_data)
+site1pc3_neighborhood_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + neighborhood_PC1, data = site1_data)
+site1pc3_neighborhood_mediation[[i]] <- mediate(site1pc3_neighborhood_demenviro_patha, site1pc3_neighborhood_envirocog_pathb, treat = 'sociodemo_PC1', 
+                                           mediator = 'neighborhood_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
 
-### Site Split 1 Neighborhood Environment and BPPCA 2
+#### Site Group 2 Mediations ####  
+  site2_data <- abcd_data_final %>%
+    filter(abcd_site %nin% site_splits_rand[,i]) %>%
+    mutate(culture_PC1 = site2_culture_PC_list[[i]]$ind$coord[,1],
+               home_PC1 = site2_home_PC_list[[i]]$ind$coord[,1],
+               school_PC1 = site2_school_PC_list[[i]]$ind$coord[,1],
+               neighborhood_PC1 = site2_neighborhood_PC_list[[i]]$ind$coord[,1],
+               sociodemo_PC1 = site2_sociodemo_PC_list[[i]]$ind$coord[,1],
+               neurocog_PC1 = site2_neurocog_PC_list[[i]]$ind$coord[,1],
+               neurocog_PC2 = site2_neurocog_PC_list[[i]]$ind$coord[,2],
+               neurocog_PC3 = site2_neurocog_PC_list[[i]]$ind$coord[,3])
 
-### Site Split 1 Neighborhood Environment and BPPCA 3
+#Site group 2: school neurocog dim 1 
+site2pc1_school_demenviro_patha <- lm(school_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc1_school_envirocog_pathb <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1 + school_PC1, data = site2_data)
+site2pc1_school_mediation[[i]] <- mediate(site2pc1_school_demenviro_patha, site2pc1_school_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'school_PC1',
+                                          boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 2: school neurocog dim 2 
+site2pc2_school_demenviro_patha <- lm(school_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc2_school_envirocog_pathb <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1 + school_PC1, data = site2_data)
+site2pc2_school_mediation[[i]] <- mediate(site2pc2_school_demenviro_patha, site2pc2_school_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 2: school neurocog dim 3 
+site2pc3_school_demenviro_patha <- lm(school_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc3_school_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + school_PC1, data = site2_data)
+site2pc3_school_mediation[[i]] <- mediate(site2pc3_school_demenviro_patha, site2pc3_school_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'school_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 2: home neurocog dim 1 
+site2pc1_home_demenviro_patha <- lm(home_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc1_home_envirocog_pathb <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1 + home_PC1, data = site2_data)
+site2pc1_home_mediation[[1]] <- mediate(site2pc1_home_demenviro_patha, site2pc1_home_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'home_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 2: home neurocog dim 2 
+site2pc2_home_demenviro_patha <- lm(home_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc2_home_envirocog_pathb <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1 + home_PC1, data = site2_data)
+site2pc2_home_mediation[[i]] <- mediate(site2pc2_home_demenviro_patha, site2pc2_home_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'home_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 2: home neurocog dim 3 
+site2pc3_home_demenviro_patha <- lm(home_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc3_home_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + home_PC1, data = site2_data)
+site2pc3_home_mediation[[i]] <- mediate(site2pc3_home_demenviro_patha, site2pc3_home_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'home_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 2: culture neurocog dim 1 
+site2pc1_culture_demenviro_patha <- lm(culture_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc1_culture_envirocog_pathb <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1 + culture_PC1, data = site2_data)
+site2pc1_culture_mediation[[i]] <- mediate(site2pc1_culture_demenviro_patha, site2pc1_culture_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 2: culture neurocog dim 2
+site2pc2_culture_demenviro_patha <- lm(culture_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc2_culture_envirocog_pathb <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1 + culture_PC1, data = site2_data)
+site2pc2_culture_mediation[[i]] <- mediate(site2pc2_culture_demenviro_patha, site2pc2_culture_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 2: culture neurocog dim 3
+site2pc3_culture_demenviro_patha <- lm(culture_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc3_culture_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + culture_PC1, data = site2_data)
+site2pc3_culture_mediation[[i]] <- mediate(site2pc3_culture_demenviro_patha, site2pc3_culture_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'culture_PC1',
+                             boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 2: neighborhood neurocog dim 1 
+site2pc1_neighborhood_demenviro_patha <- lm(neighborhood_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc1_neighborhood_envirocog_pathb <- lm(Neurocog_BPPC1_GenAbility ~ sociodemo_PC1 + neighborhood_PC1, data = site2_data)
+site2pc1_neighborhood_mediation[[i]] <- mediate(site2pc1_neighborhood_demenviro_patha, site2pc1_neighborhood_envirocog_pathb, treat = 'sociodemo_PC1', 
+                                                mediator = 'neighborhood_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 2: neighborhood neurocog dim 2
+site2pc2_neighborhood_demenviro_patha <- lm(neighborhood_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc2_neighborhood_envirocog_pathb <- lm(Neurocog_BPPC2_ExecFunc ~ sociodemo_PC1 + neighborhood_PC1, data = site2_data)
+site2pc2_neighborhood_mediation[[i]] <- mediate(site2pc2_neighborhood_demenviro_patha, site2pc2_neighborhood_envirocog_pathb, treat = 'sociodemo_PC1', 
+                                        mediator = 'neighborhood_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+#Site group 2: neighborhood neurocog dim 3
+site2pc3_neighborhood_demenviro_patha <- lm(neighborhood_PC1 ~ sociodemo_PC1, data = site2_data)
+site2pc3_neighborhood_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + neighborhood_PC1, data = site2_data)
+site2pc3_neighborhood_mediation[[i]] <- mediate(site2pc3_neighborhood_demenviro_patha, site2pc3_neighborhood_envirocog_pathb, treat = 'sociodemo_PC1', 
+                                           mediator = 'neighborhood_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
 
-### Site Split 1 Culture Environment and BPPCA 1
+rm(site1_data, site2_data, site1pc1_culture_demenviro_patha, site1pc1_culture_envirocog_pathb, site1pc1_home_demenviro_patha, site1pc1_home_envirocog_pathb,
+   site1pc1_neighborhood_demenviro_patha, site1pc1_neighborhood_envirocog_pathb, site1pc1_school_demenviro_patha, site1pc1_school_envirocog_pathb,
+   site1pc2_culture_demenviro_patha, site1pc2_culture_envirocog_pathb, site1pc2_home_demenviro_patha, site1pc2_home_envirocog_pathb,
+   site1pc2_neighborhood_demenviro_patha, site1pc2_neighborhood_envirocog_pathb, site1pc2_school_demenviro_patha, site1pc2_school_envirocog_pathb,
+   site1pc3_culture_demenviro_patha, site1pc3_culture_envirocog_pathb, site1pc3_home_demenviro_patha, site1pc3_home_envirocog_pathb,
+   site1pc3_neighborhood_demenviro_patha, site1pc3_neighborhood_envirocog_pathb, site1pc3_school_demenviro_patha, site1pc3_school_envirocog_pathb,
+   site2pc1_culture_demenviro_patha, site2pc1_culture_envirocog_pathb, site2pc1_home_demenviro_patha, site2pc1_home_envirocog_pathb,
+   site2pc1_neighborhood_demenviro_patha, site2pc1_neighborhood_envirocog_pathb, site2pc1_school_demenviro_patha, site2pc1_school_envirocog_pathb,
+   site2pc2_culture_demenviro_patha, site2pc2_culture_envirocog_pathb, site2pc2_home_demenviro_patha, site2pc2_home_envirocog_pathb,
+   site2pc2_neighborhood_demenviro_patha, site2pc2_neighborhood_envirocog_pathb, site2pc2_school_demenviro_patha, site2pc2_school_envirocog_pathb,
+   site2pc3_culture_demenviro_patha, site2pc3_culture_envirocog_pathb, site2pc3_home_demenviro_patha, site2pc3_home_envirocog_pathb,
+   site2pc3_neighborhood_demenviro_patha, site2pc3_neighborhood_envirocog_pathb, site2pc3_school_demenviro_patha, site2pc3_school_envirocog_pathb)  
+}
 
-### Site Split 1 Culture Environment and BPPCA 2
+```
 
-### Site Split 1 Culture Environment and BPPCA 3
 
-## Site Split 2 Mediation
+## Plot distribution of mediation effects
+```{r}
 
-### Site Split 2 Home Environment and BPPCA 1 
+```
 
-### Site Split 2 Home Environment and BPPCA 2 
-
-### Site Split 2 Home Environment and BPPCA 3 
-
-### Site Split 2 School Environment and BPPCA 1
-
-### Site Split 2 School Environment and BPPCA 2
-
-### Site Split 2 School Environment and BPPCA 3
-
-### Site Split 2 Neighborhood Environment and BPPCA 1
-
-### Site Split 2 Neighborhood Environment and BPPCA 2
-
-### Site Split 2 Neighborhood Environment and BPPCA 3
-
-### Site Split 2 Culture Environment and BPPCA 1
-
-### Site Split 2 Culture Environment and BPPCA 2
-
-### Site Split 2 Culture Environment and BPPCA 3
 
