@@ -466,7 +466,6 @@ second_release_bppca <- abcd_data_final %>%
 # 3. Run PCA for environmental factors, sociodemographic factors, and neurocognitive scores- full and split samples
 ```{r message=FALSE, warning=FALSE}
 ## full sample PCAs
-
 full_sample_data <- abcd_data_final %>% standardize()
 
 full_culture_pca     <- PCA(full_sample_data[CultureEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
@@ -491,12 +490,6 @@ full_sample_data <- full_sample_data %>%
 
 write_csv(full_sample_data,
           "/Users/wesleymeredith/Documents/github_repos/shared_abcd_enviro/abcd_enviro/enviro_output/abcd_enviro_fullsample.csv")
-
-# full_sample_data <- full_sample_data %>%
-#   dplyr::select(subject_id, culture_PC1, home_PC1, school_PC1, neighborhood_PC1, sociodemo_PC1,
-#                 neurocog_PC1, neurocog_PC2, neurocog_PC3, Neurocog_BPPC1_GenAbility, 
-#                 Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem) %>%
-#   na.omit()
 
 ## Release 1 and Release 2 group PCAs
 
@@ -524,7 +517,6 @@ first_release_data <- first_release_data %>%
 write_csv(first_release_data,
           "/Users/wesleymeredith/Documents/github_repos/shared_abcd_enviro/abcd_enviro/enviro_output/abcd_enviro_firstrelease.csv")
 
-
 ## Release 2 
 rel2_culture_pca     <- PCA(second_release_data[CultureEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
 rel2_home_pca        <- PCA(second_release_data[HomeEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
@@ -549,9 +541,7 @@ second_release_data <- second_release_data %>%
 write_csv(second_release_data,
           "/Users/wesleymeredith/Documents/github_repos/shared_abcd_enviro/abcd_enviro/enviro_output/abcd_enviro_secondrelease.csv")
 
-
 ## Random site groups 1 and 2 PCAs 
-
 site1_culture_PC_list <- vector("list", nrand)
 site1_home_PC_list <- vector("list", nrand)
 site1_school_PC_list <- vector("list", nrand)
