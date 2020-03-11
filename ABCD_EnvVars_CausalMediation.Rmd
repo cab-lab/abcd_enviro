@@ -21,7 +21,8 @@ library(dplyr); library(ggplot2); library(lme4); library(cvTools);  library(R.ma
 library(psych); library(lme4); library(stargazer); library(gvlma);  library(extrafont); library(lattice); library(summarytools);
 library(dplyr); library(ade4);  library(factoextra);  library(magrittr);  library(FactoMineR);  library(tidyr); library(fastDummies);
 library(tidyverse); library(lavaan); library(semPlot); library(FactoMineR); library(factoextra); library(magrittr); library(FactoMineR);
-library(mediation); library(data.table); library(corrplot); library(easystats); library(dplyr); library(Hmisc); library(foreach); library(doParallel)
+library(mediation); library(data.table); library(corrplot); library(easystats); library(dplyr); library(Hmisc); library(foreach); library(doParallel);
+library(tableone); library(gridExtra)
 
 knitr::opts_knit$set(root.dir = "../../../")
 
@@ -29,6 +30,16 @@ knitr::opts_knit$set(root.dir = "../../../")
 ## master data set just in case while working 
 ```{r}
 test_data <- read_rds("~/Documents/data/release2rds/results/ABCD_release2.0.1_update_Rds/nda2.0.1.Rds")
+
+acculturation_data <- test_data %>%
+  filter(eventname == "baseline_year_1_arm_1") %>%
+  dplyr::select(via_accult_ss_hc_p, via_accult_ss_amer_p, accult_phenx_q1, accult_phenx_q2, accult_phenx_q3_dropdwn,
+               accult_phenx_q4, accult_phenx_q5, accult_phenx_q1_p, accult_phenx_q2_p, accult_phenx_q3_dropdwn_p,
+              accult_phenx_q4_p, accult_phenx_q5_p)
+
+acculturation_table <- CreateTableOne(data = acculturation_data)
+summary(acculturation_table)
+
 ```
 
 
@@ -344,7 +355,7 @@ abcd_data_final <- abcd_data_final[complete.cases(abcd_data_final),]
 Create descriptive statistics table with missingness
 ```{r}
 
-abcd_data_stats <- abcd_data %>%
+abcd_stats_total <- abcd_data %>%
   dplyr::select(abcd_site, age, male, race_ethnicity, household.income_num, highest.education, meim_ss_exp_p, meim_ss_com_p, macvs_ss_fo_p, macvs_ss_fr_p,
          macvs_ss_fs_p, macvs_ss_isr_p, macvs_ss_r_p, fes_ss_fc_p_pr, parental_monitoring_ss_mean, fes_ss_fc_pr, crpbi_acceptance_ss_studycaregiver,
          school_risk_phenx_ss_ses, school_risk_phenx_ss_iiss, school_risk_phenx_ss_dfs, neighb_phenx_ss_mean_p, neighb_phenx, reshist_addr1_walkindex,
@@ -353,13 +364,18 @@ abcd_data_stats <- abcd_data %>%
          reshist_addr1_adi_in_dis, reshist_addr1_adi_home_v, reshist_addr1_adi_rent, reshist_addr1_adi_mortg, reshist_addr1_adi_home_o, reshist_addr1_adi_unemp,
          reshist_addr1_adi_pov, reshist_addr1_adi_b138, reshist_addr1_adi_sp, reshist_addr1_adi_ncar, reshist_addr1_adi_ntel, reshist_addr1_adi_nplumb,
          reshist_addr1_adi_crowd, nihtbx_picvocab_uncorrected, nihtbx_flanker_uncorrected, nihtbx_list_uncorrected, nihtbx_cardsort_uncorrected, 
-         nihtbx_pattern_uncorrected, nihtbx_picture_uncorrected, nihtbx_reading_uncorrected, pea_ravlt_ld, lmt_scr_perc_correct, neurocog_pc1.bl, neurocog_pc2.bl, neurocog_pc3.bl) %>%
+         nihtbx_pattern_uncorrected, nihtbx_picture_uncorrected, nihtbx_reading_uncorrected, pea_ravlt_ld, lmt_scr_perc_correct) %>%
   mutate(male = factor(male, levels = c(0,1), labels = c("female", "male")))
 
-colnames(abcd_data_stats) <- c("abcd_site", "Age", "Sex", "RaceEthnicity", "Income", "Education", "EthIdentExploration", "EthIdentCommitment", "FamObligation", "FamReferent", "FamSupport", "IndepSelfReliance", "Religion", "FamConflict_P",  "ParentMonitoring", "FamConflict_Y",  "ParentAcceptance", "SchoolEnvironment", "SchoolInvolvement", "SchoolDisengagement", "NeighSafety_P", "NeighSafety_Y", "Walkability", "NO2Exposure", "PM25Exposure","ProxRoads_log", "ResDensity_log", "UCR_ViolCrime_log", "UCR_DrugAbuse_log", "UCR_DrugSale_log", "UCR_DrugPoss_log",  "UCR_DUI_log", "UCR_MJSale_log", "ADI_Edu_LTHS", "ADI_Edu_HSDip", "ADI_Occ_WhiteCollar", "ADI_MedianFamInc",  "ADI_IncDisparityIdx", "ADI_MedianHomeValue", "ADI_MedianGrossRent", "ADI_MedianMonthMortg",  "ADI_PercHOwner",
- "ADI_PercUnemp","ADI_PercFamPoverty", "ADI_PercPovBelow138","ADI_PercSingle","ADI_PercLogNCar", "ADI_PercLogNTel", "ADI_PercLogNPlumb", "ADI_PercCrowding", "NIHtb_PicVocab","NIHtb_Flanker","NIHtb_List", "NIHtb_CardSort", "NIHtb_Pattern", "NIHtb_Picture",  "NIHtb_Reading", "RAVLT","LMT",
-"Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc","Neurocog_BPPC3_LearnMem")
+colnames(abcd_stats_total) <- c("abcd_site", "Age", "Sex", "RaceEthnicity", "Income", "Education", "EthIdentExploration", "EthIdentCommitment", "FamObligation", "FamReferent", "FamSupport", "IndepSelfReliance", "Religion", "FamConflict_P",  "ParentMonitoring", "FamConflict_Y",  "ParentAcceptance", "SchoolEnvironment", "SchoolInvolvement", "SchoolDisengagement", "NeighSafety_P", "NeighSafety_Y", "Walkability", "NO2Exposure", "PM25Exposure","ProxRoads_log", "ResDensity_log", "UCR_ViolCrime_log", "UCR_DrugAbuse_log", "UCR_DrugSale_log", "UCR_DrugPoss_log",  "UCR_DUI_log", "UCR_MJSale_log", "ADI_Edu_LTHS", "ADI_Edu_HSDip", "ADI_Occ_WhiteCollar", "ADI_MedianFamInc",  "ADI_IncDisparityIdx", "ADI_MedianHomeValue", "ADI_MedianGrossRent", "ADI_MedianMonthMortg",  "ADI_PercHOwner",
+ "ADI_PercUnemp","ADI_PercFamPoverty", "ADI_PercPovBelow138","ADI_PercSingle","ADI_PercLogNCar", "ADI_PercLogNTel", "ADI_PercLogNPlumb", "ADI_PercCrowding", "NIHtb_PicVocab","NIHtb_Flanker","NIHtb_List", "NIHtb_CardSort", "NIHtb_Pattern", "NIHtb_Picture",  "NIHtb_Reading", "RAVLT","LMT")
 
+abcd_stats_totaltab <- CreateTableOne(data = abcd_stats_total)
+abcd_stats_summarytab <- summary(abcd_stats_totaltab)
+
+abcd_stats_complete <- abcd_stats_total[complete.cases(abcd_stats_total),]
+
+(abcd_stats_completetab <- CreateTableOne(data = abcd_stats_complete))
 
 
 ```
@@ -608,6 +624,40 @@ for (i in 1:nrand){
 
 ```
 
+## Scree plots for Release 1 and Release 2 groups 
+```{r}
+#Release 1.1 
+fviz_screeplot(rel1_culture_pca, addlabels =TRUE) +
+  ggtitle("Release 1 Culture")
+fviz_screeplot(rel1_home_pca, addlabels =TRUE) +
+  ggtitle("Release 1 Home")
+fviz_screeplot(rel1_school_pca, addlabels =TRUE) +
+  ggtitle("Release 1 School")
+fviz_screeplot(rel1_neighborhood_pca, addlabels =TRUE) +
+  ggtitle("Release 1 Neighborhood")
+fviz_screeplot(rel1_sociodemo_pca, addlabels =TRUE) +
+  ggtitle("Release 1 Sociodemo")
+fviz_screeplot(rel1_neurocog_pca, addlabels =TRUE) +
+  ggtitle("Release 1 Neurocog")
+
+
+#Release 2.0.1
+fviz_screeplot(rel2_culture_pca, addlabels =TRUE) +
+  ggtitle("Release 2 Culture")
+fviz_screeplot(rel2_home_pca, addlabels =TRUE) +
+  ggtitle("Release 2 Home")
+fviz_screeplot(rel2_school_pca, addlabels =TRUE) +
+  ggtitle("Release 2 School")
+fviz_screeplot(rel2_neighborhood_pca, addlabels =TRUE) +
+  ggtitle("Release 2 Neighborhood")
+fviz_screeplot(rel2_sociodemo_pca, addlabels =TRUE) +
+  ggtitle("Release 2 Sociodemo")
+fviz_screeplot(rel2_neurocog_pca, addlabels =TRUE) +
+  ggtitle("Release 2 Neurocog")
+```
+
+
+
 ## Plot variable contributions for environment and sociodemographic categories
 
 ```{r}
@@ -620,6 +670,13 @@ color_blue <- "#2B83BA"
 color_green <- "#729c6c"
 
 pc_theme <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
+                                       panel.grid.minor = element_blank(), 
+                                       axis.title.x = element_blank(), 
+                                       axis.title.y = element_blank(),
+                                       axis.text.x = element_text(size = 12),
+                                       axis.text.y = element_text(size = 12))
+
+pc_theme2 <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
                                        panel.grid.minor = element_blank(), 
                                        axis.title.x = element_text(size = 14), 
                                        axis.title.y = element_blank(),
@@ -789,7 +846,7 @@ rel1_sociodemo_pccontrib$Contribution[rel1_negative_dir_sociodemo] <- -1 * rel1_
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_grey) +
                 coord_flip() +
-                pc_theme )
+                pc_theme2 )
 
 ggsave("rel1_sociodemo_pccontrib_plot.png")
 
@@ -807,7 +864,7 @@ rel2_sociodemo_pccontrib$Contribution[rel2_negative_dir_sociodemo] <- -1 * rel2_
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_grey) +
                 coord_flip() +
-                pc_theme )
+                pc_theme2 )
 
 ggsave("rel2_sociodemo_pccontrib_plot.png")
 
@@ -925,6 +982,25 @@ ggsave("rel2_neurocog3_pccontrib_plot.png")
 
 ```
 
+## Combine plots for Release 1 and 2 PCs
+```{r}
+
+(relplot_pcfig <- grid.arrange(rel1_home_pccontrib_plot,
+                                     rel2_home_pccontrib_plot,
+                                     rel1_school_pccontrib_plot,
+                                     rel2_school_pccontrib_plot,
+                                     rel1_neighborhood_pccontrib_plot,
+                               rel2_neighborhood_pccontrib_plot,
+                                     rel1_culture_pccontrib_plot,
+                               rel2_culture_pccontrib_plot, 
+                               rel1_sociodemo_pccontrib_plot,
+                               rel2_sociodemo_pccontrib_plot,
+                                     heights = c(1, 1, 3, 1, 1),
+                                     nrow = 5))
+ggsave('relplot_pcfig.png', relplot_pcfig, height = 17, width = 14)
+
+```
+
 
 ## Compare BPPCA and PCA results for neurocognitive scores for complete case participants
 
@@ -967,7 +1043,7 @@ ggsave("rel2_neurocog3_pccontrib_plot.png")
 
 ```{r}
 # culture 
-(rel_culture_corr <- cor.test(rel1_culture_pccontrib$Contribution, rel2_culture_pccontrib$Contribution, method = "spearman"))
+(rel_culture_corr <- cor.test(rel1_culture_pccontrib$Contribution, rel2_culture_pccontrib$Contribution, method = "pearson"))
 
 # home 
 (rel_home_corr <- cor.test(rel1_home_pccontrib$Contribution, rel2_home_pccontrib$Contribution, method = "pearson"))
@@ -976,31 +1052,46 @@ ggsave("rel2_neurocog3_pccontrib_plot.png")
 (rel_school_corr <- cor.test(rel1_school_pccontrib$Contribution, rel2_school_pccontrib$Contribution, method = "pearson"))
 
 #neighborhood
-(rel_neighborhood_corr <- cor.test(rel1_neighborhood_pccontrib$Contribution, rel2_neighborhood_pccontrib$Contribution, method = "spearman"))
+(rel_neighborhood_corr <- cor.test(rel1_neighborhood_pccontrib$Contribution, rel2_neighborhood_pccontrib$Contribution, method = "pearson"))
 
 ```
 
 
 ## Plot correlation matrix with enviro/sociodemo vars and cog BPPCAs
 
-```{r}
+```{r warning=FALSE, message=FALSE}
 
-fullvar_corr <- full_sample_data %>%
-  dplyr::select(c(3:55, 65:67)) %>%
-  cor()
+## Release 1.1 and Release 2.0.1  corr plot 
 
+rel1var_corr <- cor(first_release_data[, c(3:55, 65:67)])
+rel2var_corr <- cor(second_release_data[, c(3:55, 65:67)])
 
-#diag(variable_corr) <-  0
+relcomb_corr <- matrix(NA, nrow = 56, ncol = 56)
+relcomb_corr[lower.tri(relcomb_corr)] <- lower.tri(rel1var_corr)
+relcomb_corr[relcomb_corr] <- upper.tri(rel2var_corr)
+diag(relcomb_corr) <-  0
 
-fullvar_corr_pvals <- full_sample_data[,c(3:55, 65:67)] %>%
-        cor.mtest(method = "spearman")
+rel1var_corr_pvals <- cor.mtest(first_release_data[, c(3:55, 65:67)], method = "spearman")
+rel2var_corr_pvals <- cor.mtest(second_release_data[, c(3:55, 65:67)], method = "spearman")
 
-png("fullvar_corrplot.png", res = 400, width = 14000, height = 14000)
-variable_corrplot <- corrplot(fullvar_corr, method = 'color', type = "full", diag = FALSE, p.mat =fullvar_corr_pvals$p, 
-                              insig = "label_sig", cl.pos = "b", cl.cex = 4, pch.col = "black", pch.cex = 3, tl.cex = 2.5, tl.srt = 30, tl.col = "black",
-                              col = colorRampPalette(c("red", "white","blue"))(200))
+relcom_corr_pvals <- matrix(NA, nrow = 56, ncol = 56)
+relcom_corr_pvals[lower.tri(relcom_corr_pvals)] <- lower.tri(rel1var_corr_pvals$p)
+relcom_corr_pvals[upper.tri(relcom_corr_pvals)] <- upper.tri(rel2var_corr_pvals$p)
+diag(relcom_corr_pvals) <- 0
+
+png("relcom_corrplot.png", res = 600, width = 14000, height = 14000)
+variable_corrplot <- corrplot(relcomb_corr, method = 'color', type = "full", diag = FALSE, p.mat = relcom_corr_pvals, 
+                              insig = "label_sig", cl.pos = "b", cl.cex = 2.5, pch.col = "black", pch.cex = 2.25, tl.cex = 2.15, tl.srt = 20, tl.col = "black")
 dev.off()
-#tl.cex = .5, tl.srt = 25, tl.col = "black"  tl.pos = "n",
+
+## full sample corr plot 
+fullvar_corr <- cor(full_sample_data[, c(3:55, 65:67)])
+fullvar_corr_pvals <- cor.mtest(full_sample_data[,c(3:55, 65:67)], method = "spearman")
+
+png("fullvar_corrplot.png", res = 600, width = 14000, height = 14000)
+variable_corrplot <- corrplot(fullvar_corr, method = 'color', type = "full", diag = FALSE, p.mat =fullvar_corr_pvals$p, 
+                              insig = "label_sig", cl.pos = "b", cl.cex = 2.5, pch.col = "black", pch.cex = 2.25, tl.cex = 2.15, tl.srt = 20, tl.col = "black")
+dev.off()
 
 ```
 
