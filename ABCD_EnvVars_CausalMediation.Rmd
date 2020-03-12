@@ -1066,22 +1066,25 @@ ggsave('relplot_pcfig.png', relplot_pcfig, height = 17, width = 14)
 rel1var_corr <- cor(first_release_data[, c(3:55, 65:67)])
 rel2var_corr <- cor(second_release_data[, c(3:55, 65:67)])
 
+(rel1var_corrplot <- corrplot(rel1var_corr, method = 'color', type = "full", diag = FALSE, cl.pos = "b", cl.cex = .5, pch.col = "black", tl.cex = .15, tl.srt = 20, tl.col = "black"))
+
+(rel2var_corrplot <- corrplot(rel2var_corr, method = 'color', type = "full", diag = FALSE, cl.pos = "b", cl.cex = .5, pch.col = "black", tl.cex = .15, tl.srt = 20, tl.col = "black"))
+
 relcomb_corr <- matrix(NA, nrow = 56, ncol = 56)
-relcomb_corr[lower.tri(relcomb_corr)] <- lower.tri(rel1var_corr)
-relcomb_corr[relcomb_corr] <- upper.tri(rel2var_corr)
+relcomb_corr[lower.tri(relcomb_corr)] <- rel1var_corr[lower.tri(rel1var_corr)]
+relcomb_corr[upper.tri(relcomb_corr)] <- rel2var_corr[upper.tri(rel2var_corr)]
 diag(relcomb_corr) <-  0
 
 rel1var_corr_pvals <- cor.mtest(first_release_data[, c(3:55, 65:67)], method = "spearman")
 rel2var_corr_pvals <- cor.mtest(second_release_data[, c(3:55, 65:67)], method = "spearman")
 
 relcom_corr_pvals <- matrix(NA, nrow = 56, ncol = 56)
-relcom_corr_pvals[lower.tri(relcom_corr_pvals)] <- lower.tri(rel1var_corr_pvals$p)
-relcom_corr_pvals[upper.tri(relcom_corr_pvals)] <- upper.tri(rel2var_corr_pvals$p)
+relcom_corr_pvals[lower.tri(relcom_corr_pvals)] <- rel1var_corr_pvals$p[lower.tri(rel1var_corr_pvals$p)]
+relcom_corr_pvals[upper.tri(relcom_corr_pvals)] <- rel2var_corr_pvals$p[upper.tri(rel2var_corr_pvals$p)]
 diag(relcom_corr_pvals) <- 0
 
 png("relcom_corrplot.png", res = 600, width = 14000, height = 14000)
-variable_corrplot <- corrplot(relcomb_corr, method = 'color', type = "full", diag = FALSE, p.mat = relcom_corr_pvals, 
-                              insig = "label_sig", cl.pos = "b", cl.cex = 2.5, pch.col = "black", pch.cex = 2.25, tl.cex = 2.15, tl.srt = 20, tl.col = "black")
+variable_corrplot <- corrplot(relcomb_corr, method = 'color', type = "full", diag = FALSE, cl.pos = "b", cl.cex = 2.5, tl.cex = 2.15, tl.srt = 20, tl.col = "black")
 dev.off()
 
 ## full sample corr plot 
@@ -1716,19 +1719,373 @@ summary(secondrel2_culture_mediation)
 
 ### Release 2.0.1 Culture Environment and BPPCA 3
 ```{r}
-secondrel3_culture_totaleffect <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1, data = second_release_data)
-summary(secondrel3_culture_totaleffect)
-
 secondrel3_culture_demenviro_patha <- lm(culture_PC1 ~ sociodemo_PC1, data = second_release_data)
-summary(secondrel3_culture_demenviro_patha)
 
 secondrel3_culture_envirocog_pathb <- lm(Neurocog_BPPC3_LearnMem ~ sociodemo_PC1 + culture_PC1, data = second_release_data)
-summary(secondrel3_culture_envirocog_pathb)
 
-firstrel3_culture_mediation <- mediate(secondrel3_culture_demenviro_patha, secondrel3_culture_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'culture_PC1',
+secondrel3_culture_mediation <- mediate(secondrel3_culture_demenviro_patha, secondrel3_culture_envirocog_pathb, treat = 'sociodemo_PC1', mediator = 'culture_PC1',
                              boot = TRUE, sims = 5000, boot.ci.type = 'bca')
 
-summary(firstrel3_culture_mediation)
+summary(secondrel3_culture_mediation)
+```
+
+## Adjust p-values for mediation effects using bonferoni correction
+
+```{r}
+
+rel1_padjust <- c(firstrel1_culture_mediation, firstrel2_culture_mediation, firstrel3_culture_mediation,
+                  firstrel1_home_mediation, firstrel2_home_mediation, firstrel3_home_mediation,
+                  firstrel1_school_mediation, firstrel2_school_mediation, firstrel3_school_mediation,
+                  firstrel1_neighborhood_mediation, firstrel2_neighborhood_mediation, firstrel3_neighborhood_mediation) %>%
+  p.adjust(method = "bonferoni", n = 12)
+
+rel2_padjust <- c(secondrel1_culture_mediation, secondrel2_culture_mediation, secondrel3_culture_mediation,
+                  secondrel1_home_mediation, secondrel2_home_mediation, secondrel3_home_mediation,
+                  secondrel1_school_mediation, secondrel2_school_mediation, secondrel3_school_mediation,
+                  secondrel1_neighborhood_mediation, secondrel2_neighborhood_mediation, secondrel3_neighborhood_mediation) %>%
+  p.adjust(method = "bonferoni", n = 12)
+
+```
+
+
+# Reverse models 
+
+## Release 1 Reverse Models 
+```{r}
+## Rel 1 PC 1 Home
+firstrel1_home_patharev <- lm(sociodemo_PC1 ~ home_PC1, data = first_release_data)
+firstrel1_home_pathbrev <- lm(Neurocog_BPPC1_GenAbility ~ home_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel1_home_mediationrev <- mediate(firstrel1_home_patharev, firstrel1_home_pathbrev, treat = 'home_PC1', mediator = 'sociodemo_PC1',
+                                    boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel1_home_mediationrev)
+
+## Rel 1 PC 2 Home 
+firstrel2_home_patharev <- lm(sociodemo_PC1 ~ home_PC1, data = first_release_data)
+firstrel2_home_pathbrev <- lm(Neurocog_BPPC2_ExecFunc ~ home_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel2_home_mediationrev <- mediate(firstrel2_home_patharev, firstrel2_home_pathbrev, treat = 'home_PC1', mediator = 'sociodemo_PC1',
+                                    boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel2_home_mediationrev)
+
+## Rel 1 PC 3 Home 
+firstrel3_home_patharev <- lm(sociodemo_PC1 ~ home_PC1, data = first_release_data)
+firstrel3_home_pathbrev <- lm(Neurocog_BPPC3_LearnMem ~ home_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel3_home_mediationrev <- mediate(firstrel3_home_patharev, firstrel3_home_pathbrev, treat = 'home_PC1', mediator = 'sociodemo_PC1',
+                                    boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel3_home_mediationrev)
+
+## Rel 1 PC 1 School 
+firstrel1_school_patharev <- lm(sociodemo_PC1 ~ school_PC1, data = first_release_data)
+firstrel1_school_pathbrev <- lm(Neurocog_BPPC1_GenAbility ~ school_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel1_school_mediationrev <- mediate(firstrel1_school_patharev, firstrel1_school_pathbrev, treat = 'school_PC1', mediator = 'sociodemo_PC1',
+                                      boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel1_school_mediationrev)
+
+## Rel 1 PC 2 School
+firstrel2_school_patharev <- lm(sociodemo_PC1 ~ school_PC1, data = first_release_data)
+firstrel2_school_pathbrev <- lm(Neurocog_BPPC2_ExecFunc ~ school_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel2_school_mediationrev <- mediate(firstrel2_school_patharev, firstrel2_school_pathbrev, treat = 'school_PC1', mediator = 'sociodemo_PC1',
+                                      boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel2_school_mediationrev)
+
+## Rel 1 PC 3 School
+firstrel3_school_patharev <- lm(sociodemo_PC1 ~ school_PC1, data = first_release_data)
+firstrel3_school_pathbrev <- lm(Neurocog_BPPC3_LearnMem ~ school_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel3_school_mediationrev <- mediate(firstrel3_school_patharev, firstrel3_school_pathbrev, treat = 'school_PC1', mediator = 'sociodemo_PC1',
+                                      boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel3_school_mediationrev)
+
+## Rel 1 PC 1 Neighborhood
+firstrel1_neighborhood_patharev <- lm(sociodemo_PC1 ~ neighborhood_PC1, data = first_release_data)
+firstrel1_neighborhood_pathbrev <- lm(Neurocog_BPPC1_GenAbility ~ neighborhood_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel1_neighborhood_mediationrev <- mediate(firstrel1_neighborhood_patharev, firstrel1_neighborhood_pathbrev, 
+                                            treat = 'neighborhood_PC1', mediator = 'sociodemo_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel1_neighborhood_mediationrev)
+
+## Rel 1 PC 2 Neighborhood
+firstrel2_neighborhood_patharev <- lm(sociodemo_PC1 ~ neighborhood_PC1, data = first_release_data)
+firstrel2_neighborhood_pathbrev <- lm(Neurocog_BPPC2_ExecFunc ~ neighborhood_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel2_neighborhood_mediationrev <- mediate(firstrel2_neighborhood_patharev, firstrel2_neighborhood_pathbrev, 
+                                            treat = 'neighborhood_PC1', mediator = 'sociodemo_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel2_neighborhood_mediationrev)
+
+## Rel 1 PC 3 Neighborhood
+firstrel3_neighborhood_patharev <- lm(sociodemo_PC1 ~ neighborhood_PC1, data = first_release_data)
+firstrel3_neighborhood_pathbrev <- lm(Neurocog_BPPC3_LearnMem ~ neighborhood_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel3_neighborhood_mediationrev <- mediate(firstrel3_neighborhood_patharev, firstrel3_neighborhood_pathbrev, 
+                                            treat = 'neighborhood_PC1', mediator = 'sociodemo_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel3_neighborhood_mediationrev)
+
+## Rel 1 PC 1 Culture
+firstrel1_culture_patharev <- lm(sociodemo_PC1 ~ culture_PC1, data = first_release_data)
+firstrel1_culture_pathbrev <- lm(Neurocog_BPPC1_GenAbility ~ culture_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel1_culture_mediationrev <- mediate(firstrel1_culture_patharev, firstrel1_culture_pathbrev, treat = 'culture_PC1', mediator = 'sociodemo_PC1',
+                                       boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel1_culture_mediationrev)
+
+## Rel 1 PC 2 Culture
+firstrel2_culture_patharev <- lm(sociodemo_PC1 ~ culture_PC1, data = first_release_data)
+firstrel2_culture_pathbrev <- lm(Neurocog_BPPC2_ExecFunc ~ culture_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel2_culture_mediationrev <- mediate(firstrel2_culture_patharev, firstrel2_culture_pathbrev, treat = 'culture_PC1', mediator = 'sociodemo_PC1',
+                                       boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel2_culture_mediationrev)
+
+## Rel 1 PC 3 Culture
+firstrel3_culture_patharev <- lm(sociodemo_PC1 ~ culture_PC1, data = first_release_data)
+firstrel3_culture_pathbrev <- lm(Neurocog_BPPC3_LearnMem ~ culture_PC1 + sociodemo_PC1, data = first_release_data)
+
+firstrel3_culture_mediationrev <- mediate(firstrel3_culture_patharev, firstrel3_culture_pathbrev, treat = 'culture_PC1', mediator = 'sociodemo_PC1',
+                                       boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(firstrel3_culture_mediationrev)
+
+```
+
+## Release 2.0.1 reverse model 
+```{r}
+## Rel 1 PC 1 Home
+secondrel1_home_patharev <- lm(sociodemo_PC1 ~ home_PC1, data = second_release_data)
+secondrel1_home_pathbrev <- lm(Neurocog_BPPC1_GenAbility ~ home_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel1_home_mediationrev <- mediate(secondrel1_home_patharev, secondrel1_home_pathbrev, treat = 'home_PC1', mediator = 'sociodemo_PC1',
+                                    boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel1_home_mediationrev)
+
+## Rel 1 PC 2 Home 
+secondrel2_home_patharev <- lm(sociodemo_PC1 ~ home_PC1, data = second_release_data)
+secondrel2_home_pathbrev <- lm(Neurocog_BPPC2_ExecFunc ~ home_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel2_home_mediationrev <- mediate(secondrel2_home_patharev, secondrel2_home_pathbrev, treat = 'home_PC1', mediator = 'sociodemo_PC1',
+                                    boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel2_home_mediationrev)
+
+## Rel 1 PC 3 Home 
+secondrel3_home_patharev <- lm(sociodemo_PC1 ~ home_PC1, data = second_release_data)
+secondrel3_home_pathbrev <- lm(Neurocog_BPPC3_LearnMem ~ home_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel3_home_mediationrev <- mediate(secondrel3_home_patharev, secondrel3_home_pathbrev, treat = 'home_PC1', mediator = 'sociodemo_PC1',
+                                    boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel3_home_mediationrev)
+
+## Rel 1 PC 1 School 
+secondrel1_school_patharev <- lm(sociodemo_PC1 ~ school_PC1, data = second_release_data)
+secondrel1_school_pathbrev <- lm(Neurocog_BPPC1_GenAbility ~ school_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel1_school_mediationrev <- mediate(secondrel1_school_patharev, secondrel1_school_pathbrev, treat = 'school_PC1', mediator = 'sociodemo_PC1',
+                                      boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel1_school_mediationrev)
+
+## Rel 1 PC 2 School
+secondrel2_school_patharev <- lm(sociodemo_PC1 ~ school_PC1, data = second_release_data)
+secondrel2_school_pathbrev <- lm(Neurocog_BPPC2_ExecFunc ~ school_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel2_school_mediationrev <- mediate(secondrel2_school_patharev, secondrel2_school_pathbrev, treat = 'school_PC1', mediator = 'sociodemo_PC1',
+                                      boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel2_school_mediationrev)
+
+## Rel 1 PC 3 School
+secondrel3_school_patharev <- lm(sociodemo_PC1 ~ school_PC1, data = second_release_data)
+secondrel3_school_pathbrev <- lm(Neurocog_BPPC3_LearnMem ~ school_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel3_school_mediationrev <- mediate(secondrel3_school_patharev, secondrel3_school_pathbrev, treat = 'school_PC1', mediator = 'sociodemo_PC1',
+                                      boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel3_school_mediationrev)
+
+## Rel 1 PC 1 Neighborhood
+secondrel1_neighborhood_patharev <- lm(sociodemo_PC1 ~ neighborhood_PC1, data = second_release_data)
+secondrel1_neighborhood_pathbrev <- lm(Neurocog_BPPC1_GenAbility ~ neighborhood_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel1_neighborhood_mediationrev <- mediate(secondrel1_neighborhood_patharev, secondrel1_neighborhood_pathbrev, 
+                                            treat = 'neighborhood_PC1', mediator = 'sociodemo_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel1_neighborhood_mediationrev)
+
+## Rel 1 PC 2 Neighborhood
+secondrel2_neighborhood_patharev <- lm(sociodemo_PC1 ~ neighborhood_PC1, data = second_release_data)
+secondrel2_neighborhood_pathbrev <- lm(Neurocog_BPPC2_ExecFunc ~ neighborhood_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel2_neighborhood_mediationrev <- mediate(secondrel2_neighborhood_patharev, secondrel2_neighborhood_pathbrev, 
+                                            treat = 'neighborhood_PC1', mediator = 'sociodemo_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel2_neighborhood_mediationrev)
+
+## Rel 1 PC 3 Neighborhood
+secondrel3_neighborhood_patharev <- lm(sociodemo_PC1 ~ neighborhood_PC1, data = second_release_data)
+secondrel3_neighborhood_pathbrev <- lm(Neurocog_BPPC3_LearnMem ~ neighborhood_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel3_neighborhood_mediationrev <- mediate(secondrel3_neighborhood_patharev, secondrel3_neighborhood_pathbrev, 
+                                            treat = 'neighborhood_PC1', mediator = 'sociodemo_PC1', boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel3_neighborhood_mediationrev)
+
+## Rel 1 PC 1 Culture
+secondrel1_culture_patharev <- lm(sociodemo_PC1 ~ culture_PC1, data = second_release_data)
+secondrel1_culture_pathbrev <- lm(Neurocog_BPPC1_GenAbility ~ culture_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel1_culture_mediationrev <- mediate(secondrel1_culture_patharev, secondrel1_culture_pathbrev, treat = 'culture_PC1', mediator = 'sociodemo_PC1',
+                                       boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel1_culture_mediationrev)
+
+## Rel 1 PC 2 Culture
+secondrel2_culture_patharev <- lm(sociodemo_PC1 ~ culture_PC1, data = second_release_data)
+secondrel2_culture_pathbrev <- lm(Neurocog_BPPC2_ExecFunc ~ culture_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel2_culture_mediationrev <- mediate(secondrel2_culture_patharev, secondrel2_culture_pathbrev, treat = 'culture_PC1', mediator = 'sociodemo_PC1',
+                                       boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel2_culture_mediationrev)
+
+## Rel 1 PC 3 Culture
+secondrel3_culture_patharev <- lm(sociodemo_PC1 ~ culture_PC1, data = second_release_data)
+secondrel3_culture_pathbrev <- lm(Neurocog_BPPC3_LearnMem ~ culture_PC1 + sociodemo_PC1, data = second_release_data)
+
+secondrel3_culture_mediationrev <- mediate(secondrel3_culture_patharev, secondrel3_culture_pathbrev, treat = 'culture_PC1', mediator = 'sociodemo_PC1',
+                                       boot = TRUE, sims = 5000, boot.ci.type = 'bca')
+summary(secondrel3_culture_mediationrev)
+
+```
+
+
+## Bonferoni correct p values 
+```{r}
+## Create vectors for p values 
+
+### Release 1.1
+#### Standard Model
+rel1_mediation_pvals <- c(rep(NA, 12))
+
+rel1_mediation_pvals[1] <- firstrel1_home_mediation$n.avg.p
+rel1_mediation_pvals[2] <- firstrel2_home_mediation$n.avg.p
+rel1_mediation_pvals[3] <- firstrel3_home_mediation$n.avg.p
+rel1_mediation_pvals[4] <- firstrel1_school_mediation$n.avg.p
+rel1_mediation_pvals[5] <- firstrel2_school_mediation$n.avg.p
+rel1_mediation_pvals[6] <- firstrel3_school_mediation$n.avg.p
+rel1_mediation_pvals[7] <- firstrel1_neighborhood_mediation$n.avg.p
+rel1_mediation_pvals[8] <- firstrel2_neighborhood_mediation$n.avg.p
+rel1_mediation_pvals[9] <- firstrel3_neighborhood_mediation$n.avg.p
+rel1_mediation_pvals[10] <- firstrel1_culture_mediation$n.avg.p
+rel1_mediation_pvals[11] <- firstrel2_culture_mediation$n.avg.p
+rel1_mediation_pvals[12] <- firstrel3_culture_mediation$n.avg.p
+
+#### Reverse Model
+rel1_mediationrev_pvals <- c(rep(NA, 12))
+
+rel1_mediationrev_pvals[1] <- firstrel1_home_mediationrev$n.avg.p
+rel1_mediationrev_pvals[2] <- firstrel2_home_mediationrev$n.avg.p
+rel1_mediationrev_pvals[3] <- firstrel3_home_mediationrev$n.avg.p
+rel1_mediationrev_pvals[4] <- firstrel1_school_mediationrev$n.avg.p
+rel1_mediationrev_pvals[5] <- firstrel2_school_mediationrev$n.avg.p
+rel1_mediationrev_pvals[6] <- firstrel3_school_mediationrev$n.avg.p
+rel1_mediationrev_pvals[7] <- firstrel1_neighborhood_mediationrev$n.avg.p
+rel1_mediationrev_pvals[8] <- firstrel2_neighborhood_mediationrev$n.avg.p
+rel1_mediationrev_pvals[9] <- firstrel3_neighborhood_mediationrev$n.avg.p
+rel1_mediationrev_pvals[10] <- firstrel1_culture_mediationrev$n.avg.p
+rel1_mediationrev_pvals[11] <- firstrel2_culture_mediationrev$n.avg.p
+rel1_mediationrev_pvals[12] <- firstrel3_culture_mediationrev$n.avg.p
+
+### Release 2.0.1
+#### Standard model
+rel2_mediation_pvals <- c(rep(NA, 12))
+
+rel2_mediation_pvals[1] <- secondrel1_home_mediation$n.avg.p
+rel2_mediation_pvals[2] <- secondrel2_home_mediation$n.avg.p
+rel2_mediation_pvals[3] <- secondrel3_home_mediation$n.avg.p
+rel2_mediation_pvals[4] <- secondrel1_school_mediation$n.avg.p
+rel2_mediation_pvals[5] <- secondrel2_school_mediation$n.avg.p
+rel2_mediation_pvals[6] <- secondrel3_school_mediation$n.avg.p
+rel2_mediation_pvals[7] <- secondrel1_neighborhood_mediation$n.avg.p
+rel2_mediation_pvals[8] <- secondrel2_neighborhood_mediation$n.avg.p
+rel2_mediation_pvals[9] <- secondrel3_neighborhood_mediation$n.avg.p
+rel2_mediation_pvals[10] <- secondrel1_culture_mediation$n.avg.p
+rel2_mediation_pvals[11] <- secondrel2_culture_mediation$n.avg.p
+rel2_mediation_pvals[12] <- secondrel3_culture_mediation$n.avg.p
+
+#### Reverse model
+rel2_mediationrev_pvals <- c(rep(NA, 12))
+
+rel2_mediationrev_pvals[1] <- secondrel1_home_mediationrev$n.avg.p
+rel2_mediationrev_pvals[2] <- secondrel2_home_mediationrev$n.avg.p
+rel2_mediationrev_pvals[3] <- secondrel3_home_mediationrev$n.avg.p
+rel2_mediationrev_pvals[4] <- secondrel1_school_mediationrev$n.avg.p
+rel2_mediationrev_pvals[5] <- secondrel2_school_mediationrev$n.avg.p
+rel2_mediationrev_pvals[6] <- secondrel3_school_mediationrev$n.avg.p
+rel2_mediationrev_pvals[7] <- secondrel1_neighborhood_mediationrev$n.avg.p
+rel2_mediationrev_pvals[8] <- secondrel2_neighborhood_mediationrev$n.avg.p
+rel2_mediationrev_pvals[9] <- secondrel3_neighborhood_mediationrev$n.avg.p
+rel2_mediationrev_pvals[10] <- secondrel1_culture_mediationrev$n.avg.p
+rel2_mediationrev_pvals[11] <- secondrel2_culture_mediationrev$n.avg.p
+rel2_mediationrev_pvals[12] <- secondrel3_culture_mediationrev$n.avg.p
+
+## Correct for multiple comparisons 
+
+### Release 1.1 
+#### Standard model
+rel1_mediation_pvals_corrected <- p.adjust(rel1_mediation_pvals, method = "bonferroni", n = length(rel1_mediation_pvals))
+
+#### Reverse model
+rel1_mediationrev_pvals_corrected <- p.adjust(rel1_mediationrev_pvals, method = "bonferroni", n = length(rel1_mediationrev_pvals))
+
+### Release 2.0.1 
+#### Standard model
+rel2_mediation_pvals_corrected <- p.adjust(rel2_mediation_pvals, method = "bonferroni", n = length(rel2_mediation_pvals))
+
+#### Reverse model
+rel2_mediationrev_pvals_corrected <- p.adjust(rel2_mediationrev_pvals, method = "bonferroni", n = length(rel2_mediationrev_pvals))
+
+```
+
+
+## Visualize mediation effects and relationships between Enviro PCs and Cog outcomes 
+```{r}
+
+## subset PCs from first and second rel and correlate 
+
+rel1_pc_corr <- first_release_data %>%
+  dplyr::select(home_PC1, school_PC1, neighborhood_PC1, culture_PC1, Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem) %>%
+  cor()
+
+rel2_pc_corr <- second_release_data %>%
+  dplyr::select(home_PC1, school_PC1, neighborhood_PC1, culture_PC1, Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem) %>%
+  cor()
+
+(corrplot(rel1_pc_corr))
+(corrplot(rel2_pc_corr))
+
+release_pc_corrs <- data.frame(rel1_BPPC1 = rel1_pc_corr[1:4, 5], rel2_BPPC1 = rel2_pc_corr[1:4, 5],
+                               rel1_BPPC2 = rel1_pc_corr[1:4, 6], rel2_BPPC2 = rel2_pc_corr[1:4, 6],
+                               rel1_BPPC3 = rel1_pc_corr[1:4, 7], rel2_BPPC3 = rel2_pc_corr[1:4, 7])
+
+
+
+
+## Grab and order orrected p-vales for standard and reverse models 
+
+release_pc_pvals <- data.frame(rel1_BPPC1 = rel1_mediation_pvals_corrected[c(1,4,7,10)], rel2_BPPC1 = rel2_mediation_pvals_corrected[c(1,4,7,10)],
+                               rel1_BPPC2 = rel1_mediation_pvals_corrected[c(2,5,8,11)], rel2_BPPC2 = rel2_mediation_pvals_corrected[c(2,5,8,11)],
+                               rel1_BPPC3 = rel1_mediation_pvals_corrected[c(3,6,9,12)], rel2_BPPC3 = rel2_mediation_pvals_corrected[c(3,6,9,12)])
+
+releaserev_pc_pvals <- data.frame(rel1_BPPC1 = rel1_mediationrev_pvals_corrected[c(1,4,7,10)], rel2_BPPC1 = rel2_mediationrev_pvals_corrected[c(1,4,7,10)],
+                               rel1_BPPC2 = rel1_mediationrev_pvals_corrected[c(2,5,8,11)], rel2_BPPC2 = rel2_mediationrev_pvals_corrected[c(2,5,8,11)],
+                               rel1_BPPC3 = rel1_mediationrev_pvals_corrected[c(3,6,9,12)], rel2_BPPC3 = rel2_mediationrev_pvals_corrected[c(3,6,9,12)])
+
+## Plot Corrplots with corrected bonferroni p-values 
+
+png("release_standmed_corrplot.png", res = 600, width = 10000, height = 5000)
+(release_standmed_corrplot <- corrplot(as.matrix(release_pc_corrs), method = 'color', type = "full", diag = FALSE, p.mat = as.matrix(release_pc_pvals), 
+                              insig = "label_sig", cl.pos = "r", cl.cex = 2, pch.col = "black", pch.cex = 5, tl.cex = 2.15, tl.srt = 20, tl.col = "black"))
+dev.off()
+
+png("release_revmed_corrplot.png", res = 600, width = 10000, height = 5000)
+(release_revmed_corrplot <- corrplot(as.matrix(release_pc_corrs), method = 'color', type = "full", diag = FALSE, p.mat = as.matrix(releaserev_pc_pvals), 
+                              insig = "label_sig", cl.pos = "r", cl.cex = 2, pch.col = "black", pch.cex = 5, tl.cex = 2.15, tl.srt = 20, tl.col = "black"))
+dev.off()
+
+
 ```
 
 
