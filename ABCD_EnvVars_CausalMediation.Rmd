@@ -377,6 +377,7 @@ abcd_stats_complete <- abcd_stats_total[complete.cases(abcd_stats_total),]
 
 (abcd_stats_completetab <- CreateTableOne(data = abcd_stats_complete))
 
+write.table(abcd_stats_completetab, file = "abcd_stats_table.txt", sep = ",", quote = FALSE, row.names = FALSE)
 
 ```
 
@@ -673,14 +674,21 @@ pc_theme <- theme_minimal() + theme(legend.position="none", panel.grid.major = e
                                        panel.grid.minor = element_blank(), 
                                        axis.title.x = element_blank(), 
                                        axis.title.y = element_blank(),
-                                       axis.text.x = element_text(size = 12),
+                                      axis.text.x = element_text(size = 14),
+                                       axis.text.y = element_text(size = 12))
+
+pc_theme_toptitles <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
+                                       panel.grid.minor = element_blank(), 
+                                       axis.title.x = element_blank(), 
+                                       axis.title.y = element_blank(),
+                                       axis.text.x = element_text(size = 14),
                                        axis.text.y = element_text(size = 12))
 
 pc_theme2 <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
                                        panel.grid.minor = element_blank(), 
                                        axis.title.x = element_text(size = 14), 
                                        axis.title.y = element_blank(),
-                                       axis.text.x = element_text(size = 12),
+                                       axis.text.x = element_text(size = 14),
                                        axis.text.y = element_text(size = 12))
 
 # Culture 
@@ -697,6 +705,7 @@ rel1_culture_pccontrib$Contribution[rel1_negative_dir_culture] <- -1 * rel1_cult
 (rel1_culture_pccontrib_plot <- rel1_culture_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_red) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -715,6 +724,7 @@ rel2_culture_pccontrib$Contribution[rel2_negative_dir_culture] <- -1 * rel2_cult
 (rel2_culture_pccontrib_plot <- rel2_culture_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_red) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -734,8 +744,10 @@ rel1_home_pccontrib$Contribution[rel1_negative_dir_home] <- -1 * rel1_home_pccon
 (rel1_home_pccontrib_plot <- rel1_home_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_orange) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
-                pc_theme )
+                ggtitle("Release 1.1 PCA Loadings") +
+                pc_theme_toptitles )
 
 ggsave("rel1_home_pccontrib_plot.png")
 
@@ -752,8 +764,10 @@ rel2_home_pccontrib$Contribution[rel2_negative_dir_home] <- -1 * rel2_home_pccon
 (rel2_home_pccontrib_plot <- rel2_home_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_orange) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
-                pc_theme )
+                ggtitle("Release 2.0.1 PCA Loadings") +
+                pc_theme_toptitles )
 
 ggsave("rel2_home_pccontrib_plot.png")
 
@@ -771,6 +785,7 @@ rel1_school_pccontrib$Contribution[rel1_negative_dir_school] <- -1 * rel1_school
 (rel1_school_pccontrib_plot <- rel1_school_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_blue) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -789,6 +804,7 @@ rel2_school_pccontrib$Contribution[rel2_negative_dir_school] <- -1 * rel2_school
 (rel2_school_pccontrib_plot <- rel2_school_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_blue) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -808,6 +824,7 @@ rel1_neighborhood_pccontrib$Contribution[rel1_negative_dir_neighborhood] <- -1 *
 (rel1_neighborhood_pccontrib_plot <- rel1_neighborhood_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_green) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -826,6 +843,7 @@ rel2_neighborhood_pccontrib$Contribution[rel2_negative_dir_neighborhood] <- -1 *
 (rel2_neighborhood_pccontrib_plot <- rel2_neighborhood_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_green) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -845,6 +863,7 @@ rel1_sociodemo_pccontrib$Contribution[rel1_negative_dir_sociodemo] <- -1 * rel1_
 (rel1_sociodemo_pccontrib_plot <- rel1_sociodemo_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_grey) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme2 )
 
@@ -863,6 +882,7 @@ rel2_sociodemo_pccontrib$Contribution[rel2_negative_dir_sociodemo] <- -1 * rel2_
 (rel2_sociodemo_pccontrib_plot <- rel2_sociodemo_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_grey) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme2 )
 
@@ -882,6 +902,7 @@ rel1_neurocog1_pccontrib$Contribution[rel1_negative_dir_neurocog1] <- -1 * rel1_
 (rel1_neurocog1_pccontrib_plot <- rel1_neurocog1_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -900,6 +921,7 @@ rel2_neurocog1_pccontrib$Contribution[rel2_negative_dir_neurocog1] <- -1 * rel2_
 (rel2_neurocog1_pccontrib_plot <- rel2_neurocog1_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -919,6 +941,7 @@ rel1_neurocog2_pccontrib$Contribution[rel1_negative_dir_neurocog2] <- -1 * rel1_
 (rel1_neurocog2_pccontrib_plot <- rel1_neurocog2_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -937,6 +960,7 @@ rel2_neurocog2_pccontrib$Contribution[rel2_negative_dir_neurocog2] <- -1 * rel2_
 (rel2_neurocog2_pccontrib_plot <- rel2_neurocog2_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -956,6 +980,7 @@ rel1_neurocog3_pccontrib$Contribution[rel1_negative_dir_neurocog3] <- -1 * rel1_
 (rel1_neurocog3_pccontrib_plot <- rel1_neurocog3_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -974,6 +999,7 @@ rel2_neurocog3_pccontrib$Contribution[rel2_negative_dir_neurocog3] <- -1 * rel2_
 (rel2_neurocog3_pccontrib_plot <- rel2_neurocog3_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
+    scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1054,6 +1080,8 @@ ggsave('relplot_pcfig.png', relplot_pcfig, height = 17, width = 14)
 #neighborhood
 (rel_neighborhood_corr <- cor.test(rel1_neighborhood_pccontrib$Contribution, rel2_neighborhood_pccontrib$Contribution, method = "pearson"))
 
+
+
 ```
 
 
@@ -1061,30 +1089,44 @@ ggsave('relplot_pcfig.png', relplot_pcfig, height = 17, width = 14)
 
 ```{r warning=FALSE, message=FALSE}
 
+corr_color <- rev(brewer.pal(4, "RdBu"))
+
+corr_color2 <- colorRampPalette(c(corr_color[1:2], "white", corr_color[3:4]))
+
 ## Release 1.1 and Release 2.0.1  corr plot 
 
-rel1var_corr <- cor(first_release_data[, c(3:55, 65:67)])
-rel2var_corr <- cor(second_release_data[, c(3:55, 65:67)])
-
-(rel1var_corrplot <- corrplot(rel1var_corr, method = 'color', type = "full", diag = FALSE, cl.pos = "b", cl.cex = .5, pch.col = "black", tl.cex = .15, tl.srt = 20, tl.col = "black"))
-
-(rel2var_corrplot <- corrplot(rel2var_corr, method = 'color', type = "full", diag = FALSE, cl.pos = "b", cl.cex = .5, pch.col = "black", tl.cex = .15, tl.srt = 20, tl.col = "black"))
+rel1var_corr <- cor(first_release_data[, c(3:11, 19:55, 12:18, 65:67)])
+rel2var_corr <- cor(second_release_data[, c(3:11, 19:55, 12:18, 65:67)])
 
 relcomb_corr <- matrix(NA, nrow = 56, ncol = 56)
 relcomb_corr[lower.tri(relcomb_corr)] <- rel1var_corr[lower.tri(rel1var_corr)]
 relcomb_corr[upper.tri(relcomb_corr)] <- rel2var_corr[upper.tri(rel2var_corr)]
 diag(relcomb_corr) <-  0
 
-rel1var_corr_pvals <- cor.mtest(first_release_data[, c(3:55, 65:67)], method = "spearman")
-rel2var_corr_pvals <- cor.mtest(second_release_data[, c(3:55, 65:67)], method = "spearman")
+rel1var_corr_pvals <- cor.mtest(first_release_data[, c(3:11, 19:55, 12:18, 65:67)], method = "spearman")
+rel2var_corr_pvals <- cor.mtest(second_release_data[,  c(3:11, 19:55, 12:18, 65:67)], method = "spearman")
 
 relcom_corr_pvals <- matrix(NA, nrow = 56, ncol = 56)
 relcom_corr_pvals[lower.tri(relcom_corr_pvals)] <- rel1var_corr_pvals$p[lower.tri(rel1var_corr_pvals$p)]
 relcom_corr_pvals[upper.tri(relcom_corr_pvals)] <- rel2var_corr_pvals$p[upper.tri(rel2var_corr_pvals$p)]
 diag(relcom_corr_pvals) <- 0
 
-png("relcom_corrplot.png", res = 600, width = 14000, height = 14000)
-variable_corrplot <- corrplot(relcomb_corr, method = 'color', type = "full", diag = FALSE, cl.pos = "b", cl.cex = 2.5, tl.cex = 2.15, tl.srt = 20, tl.col = "black")
+rownames(relcomb_corr) <- c("Age", "Male", "White", "Black", "Hispanic", "Asian", "Other Race", "Household Income", "Caregiver Education", "Family Conflict (Parent)",
+                            "Parent Monitoring", "Family Conflict (Youth)", "Parent Acceptance", "School Environment", "School Involvement", "School Disengagement",
+                            "Neighborhood Safety (Parent)", "Neighborhood Safety (Youth)", "Walkability", "NO2 Exposure", "PM25 Exposure","Proximity to Roads (log)",
+                            "Residential Density (log)", "Violent Crime Rate (log)", "Drug Abuse Rate (log)", "Drug Sales Rate (log)", "Drug Possession Rate (log)",
+                            "DUI Rate (log)", "Marijuana Sales Rate (log)", "Education < HS", "Education - HS Diploma", "Occupation- White Collar",
+                            "Median Family Income",  "Income Disparity Index", "Median Home Value", "Median Gross Rent", "Median Monthly Mortgage",  
+                            "Home Ownership (%)","Unemployed (%)","Families in Poverty (%)", "Below Povery Line (%)","Single/Not Married (%)",
+                            "Car Ownership (%, log)", "Telephone in Home (%, log)", "Plumbing in Home (%, log)", "Overcrowding (%)", 
+                            "Ethnic Identy Exploration", "Ethnic Identity Commitment", "Family Obligation", "Family as Referent", "Family Support",
+                            "Indepence/SelfReliance", "Religion", "Cog - General Ability", "Cog - Executive Function", "Cog - Learning/Memory")
+
+colnames(relcomb_corr) <- c(rep(" ", 56))
+
+png("relcom_corrplot.png", res = 700, width = 16000, height = 12000)
+(variable_corrplot <- corrplot(relcomb_corr, method = 'color', col = corr_color2(100), type = "full", diag = FALSE, cl.pos = "r", cl.cex = 1.8, tl.cex = 1.8, tl.col = "black", tl.srt = 0))
+corrRect(c(9, 4, 3, 30, 7, 3), col = c(color_grey, color_orange, color_blue, color_green, color_red, color_teal), lwd = 6)
 dev.off()
 
 ## full sample corr plot 
@@ -1092,8 +1134,8 @@ fullvar_corr <- cor(full_sample_data[, c(3:55, 65:67)])
 fullvar_corr_pvals <- cor.mtest(full_sample_data[,c(3:55, 65:67)], method = "spearman")
 
 png("fullvar_corrplot.png", res = 600, width = 14000, height = 14000)
-variable_corrplot <- corrplot(fullvar_corr, method = 'color', type = "full", diag = FALSE, p.mat =fullvar_corr_pvals$p, 
-                              insig = "label_sig", cl.pos = "b", cl.cex = 2.5, pch.col = "black", pch.cex = 2.25, tl.cex = 2.15, tl.srt = 20, tl.col = "black")
+(variable_corrplot <- corrplot(fullvar_corr, method = 'color', type = "full", diag = FALSE, p.mat =fullvar_corr_pvals$p, col = corr_color,
+                              insig = "label_sig", cl.pos = "b", cl.cex = 2.5, pch.col = "black", pch.cex = 2.25, tl.cex = 2.15, tl.srt = 20, tl.col = "black"))
 dev.off()
 
 ```
@@ -2040,28 +2082,25 @@ rel2_mediationrev_pvals_corrected <- p.adjust(rel2_mediationrev_pvals, method = 
 ```
 
 
-## Visualize mediation effects and relationships between Enviro PCs and Cog outcomes 
+## Visualize mediation effects and relationships between sociodemo PCs and Cog outcomes 
 ```{r}
 
-## subset PCs from first and second rel and correlate 
+## subset socio demoPCs from first and second rel and correlate 
 
 rel1_pc_corr <- first_release_data %>%
-  dplyr::select(home_PC1, school_PC1, neighborhood_PC1, culture_PC1, Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem) %>%
+  dplyr::select(sociodemo_PC1, sociodemo_PC1, sociodemo_PC1, sociodemo_PC1, Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem) %>%
   cor()
 
 rel2_pc_corr <- second_release_data %>%
-  dplyr::select(home_PC1, school_PC1, neighborhood_PC1, culture_PC1, Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem) %>%
+  dplyr::select(sociodemo_PC1, sociodemo_PC1, sociodemo_PC1, sociodemo_PC1, Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem) %>%
   cor()
 
 (corrplot(rel1_pc_corr))
 (corrplot(rel2_pc_corr))
 
-release_pc_corrs <- data.frame(rel1_BPPC1 = rel1_pc_corr[1:4, 5], rel2_BPPC1 = rel2_pc_corr[1:4, 5],
-                               rel1_BPPC2 = rel1_pc_corr[1:4, 6], rel2_BPPC2 = rel2_pc_corr[1:4, 6],
-                               rel1_BPPC3 = rel1_pc_corr[1:4, 7], rel2_BPPC3 = rel2_pc_corr[1:4, 7])
-
-
-
+release_pc_corrs <- data.frame(rel1_BPPC1 = rep(rel1_pc_corr[1, 2],4), rel2_BPPC1 = rep(rel2_pc_corr[1, 2],4),
+                               rel1_BPPC2 = rep(rel1_pc_corr[1, 3], 4), rel2_BPPC2 = rep(rel2_pc_corr[1, 3],4),
+                               rel1_BPPC3 = rel1_pc_corr[1, 4], rel2_BPPC3 = rep(rel2_pc_corr[1, 4], 4))
 
 ## Grab and order orrected p-vales for standard and reverse models 
 
@@ -2075,14 +2114,14 @@ releaserev_pc_pvals <- data.frame(rel1_BPPC1 = rel1_mediationrev_pvals_corrected
 
 ## Plot Corrplots with corrected bonferroni p-values 
 
-png("release_standmed_corrplot.png", res = 600, width = 10000, height = 5000)
-(release_standmed_corrplot <- corrplot(as.matrix(release_pc_corrs), method = 'color', type = "full", diag = FALSE, p.mat = as.matrix(release_pc_pvals), 
-                              insig = "label_sig", cl.pos = "r", cl.cex = 2, pch.col = "black", pch.cex = 5, tl.cex = 2.15, tl.srt = 20, tl.col = "black"))
+png("release_standmed_corrplot.png", res = 600, width = 10000, height = 6000)
+(release_standmed_corrplot <- corrplot(as.matrix(release_pc_corrs), method = 'color', col = corr_color2(100), type = "full", p.mat = as.matrix(release_pc_pvals), 
+                              insig = "label_sig", cl.pos = "r", cl.cex = 1.5, pch.col = "black", pch.cex = 5, tl.pos = "n"))
 dev.off()
 
-png("release_revmed_corrplot.png", res = 600, width = 10000, height = 5000)
-(release_revmed_corrplot <- corrplot(as.matrix(release_pc_corrs), method = 'color', type = "full", diag = FALSE, p.mat = as.matrix(releaserev_pc_pvals), 
-                              insig = "label_sig", cl.pos = "r", cl.cex = 2, pch.col = "black", pch.cex = 5, tl.cex = 2.15, tl.srt = 20, tl.col = "black"))
+png("release_revmed_corrplot.png", res = 600, width = 10000, height = 6000)
+(release_revmed_corrplot <- corrplot(as.matrix(release_pc_corrs), method = 'color', col = corr_color2(100), type = "full", p.mat = as.matrix(releaserev_pc_pvals), 
+                              insig = "label_sig", cl.pos = "r", cl.cex = 1.5, pch.col = "black", pch.cex = 5, tl.pos = "n"))
 dev.off()
 
 
