@@ -23,6 +23,7 @@ library(dplyr); library(ade4);  library(factoextra);  library(magrittr);  librar
 library(tidyverse); library(lavaan); library(semPlot); library(FactoMineR); library(factoextra); library(magrittr); library(FactoMineR);
 library(mediation); library(data.table); library(corrplot); library(easystats); library(dplyr); library(Hmisc); library(foreach); library(doParallel);
 library(tableone); library(gridExtra)
+library(RColorBrewer)
 
 knitr::opts_knit$set(root.dir = "../../../")
 
@@ -356,19 +357,44 @@ Create descriptive statistics table with missingness
 ```{r}
 
 abcd_stats_total <- abcd_data %>%
-  dplyr::select(abcd_site, age, male, race_ethnicity, household.income_num, highest.education, meim_ss_exp_p, meim_ss_com_p, macvs_ss_fo_p, macvs_ss_fr_p,
-         macvs_ss_fs_p, macvs_ss_isr_p, macvs_ss_r_p, fes_ss_fc_p_pr, parental_monitoring_ss_mean, fes_ss_fc_pr, crpbi_acceptance_ss_studycaregiver,
-         school_risk_phenx_ss_ses, school_risk_phenx_ss_iiss, school_risk_phenx_ss_dfs, neighb_phenx_ss_mean_p, neighb_phenx, reshist_addr1_walkindex,
+  dplyr::select(abcd_site, age, male, race_ethnicity, household.income_num, highest.education, 
+                #home 
+         fes_ss_fc_p_pr, parental_monitoring_ss_mean, fes_ss_fc_pr, crpbi_acceptance_ss_studycaregiver,
+         #school
+         school_risk_phenx_ss_ses, school_risk_phenx_ss_iiss, school_risk_phenx_ss_dfs, 
+         #neighborhood
+         neighb_phenx_ss_mean_p, neighb_phenx, reshist_addr1_walkindex,
          reshist_addr1_no2, reshist_addr1_pm25, ProxRoads_log, Res_density_log, UCR_ViolCrime_log, UCR_DrugAbuse_log, UCR_DrugSale_log, UCR_DrugPoss_log,
          UCR_DUI_log, UCR_MJSale_log, reshist_addr1_adi_edu_l, reshist_addr1_adi_edu_h, reshist_addr1_adi_work_c, reshist_addr1_adi_income, 
          reshist_addr1_adi_in_dis, reshist_addr1_adi_home_v, reshist_addr1_adi_rent, reshist_addr1_adi_mortg, reshist_addr1_adi_home_o, reshist_addr1_adi_unemp,
          reshist_addr1_adi_pov, reshist_addr1_adi_b138, reshist_addr1_adi_sp, reshist_addr1_adi_ncar, reshist_addr1_adi_ntel, reshist_addr1_adi_nplumb,
-         reshist_addr1_adi_crowd, nihtbx_picvocab_uncorrected, nihtbx_flanker_uncorrected, nihtbx_list_uncorrected, nihtbx_cardsort_uncorrected, 
-         nihtbx_pattern_uncorrected, nihtbx_picture_uncorrected, nihtbx_reading_uncorrected, pea_ravlt_ld, lmt_scr_perc_correct) %>%
+         reshist_addr1_adi_crowd,
+         
+         #culture
+         meim_ss_exp_p, meim_ss_com_p, macvs_ss_fo_p, macvs_ss_fr_p, macvs_ss_fs_p, macvs_ss_isr_p, macvs_ss_r_p,
+         # neurocog 
+         nihtbx_picvocab_uncorrected, nihtbx_flanker_uncorrected, nihtbx_list_uncorrected, nihtbx_cardsort_uncorrected, 
+         nihtbx_pattern_uncorrected, nihtbx_picture_uncorrected, nihtbx_reading_uncorrected, pea_ravlt_ld, lmt_scr_perc_correct, neurocog_pc1.bl, neurocog_pc2.bl, neurocog_pc3.bl) %>%
   mutate(male = factor(male, levels = c(0,1), labels = c("female", "male")))
 
-colnames(abcd_stats_total) <- c("abcd_site", "Age", "Sex", "RaceEthnicity", "Income", "Education", "EthIdentExploration", "EthIdentCommitment", "FamObligation", "FamReferent", "FamSupport", "IndepSelfReliance", "Religion", "FamConflict_P",  "ParentMonitoring", "FamConflict_Y",  "ParentAcceptance", "SchoolEnvironment", "SchoolInvolvement", "SchoolDisengagement", "NeighSafety_P", "NeighSafety_Y", "Walkability", "NO2Exposure", "PM25Exposure","ProxRoads_log", "ResDensity_log", "UCR_ViolCrime_log", "UCR_DrugAbuse_log", "UCR_DrugSale_log", "UCR_DrugPoss_log",  "UCR_DUI_log", "UCR_MJSale_log", "ADI_Edu_LTHS", "ADI_Edu_HSDip", "ADI_Occ_WhiteCollar", "ADI_MedianFamInc",  "ADI_IncDisparityIdx", "ADI_MedianHomeValue", "ADI_MedianGrossRent", "ADI_MedianMonthMortg",  "ADI_PercHOwner",
- "ADI_PercUnemp","ADI_PercFamPoverty", "ADI_PercPovBelow138","ADI_PercSingle","ADI_PercLogNCar", "ADI_PercLogNTel", "ADI_PercLogNPlumb", "ADI_PercCrowding", "NIHtb_PicVocab","NIHtb_Flanker","NIHtb_List", "NIHtb_CardSort", "NIHtb_Pattern", "NIHtb_Picture",  "NIHtb_Reading", "RAVLT","LMT")
+
+colnames(abcd_stats_total) <- c("ABCD Site", "Age", "Sex", "Race/Ethnicity", "Household Income", "Caregiver Education", 
+                            
+                            "Family Conflict (Parent)","Parent Monitoring", "Family Conflict (Youth)", "Parent Acceptance", 
+                            
+                            "School Environment", "School Involvement", "School Disengagement",
+                            
+                            "Neighborhood Safety (Parent)", "Neighborhood Safety (Youth)", "Walkability", "NO2 Exposure", "PM25 Exposure","Proximity to Roads (log)",
+                            "Residential Density (log)", "Violent Crime Rate (log)", "Drug Abuse Rate (log)", "Drug Sales Rate (log)", "Drug Possession Rate (log)",
+                            "DUI Rate (log)", "Marijuana Sales Rate (log)", "Education < HS", "Education - HS Diploma", "Occupation- White Collar",
+                            "Median Family Income",  "Income Disparity Index", "Median Home Value", "Median Gross Rent", "Median Monthly Mortgage",  
+                            "Home Ownership (%)","Unemployed (%)","Families in Poverty (%)", "Families Below 138% Povery Line (%)","Single/Not Married (%)",
+                            "Car Ownership (%, log)", "Telephone in Home (%, log)", "Plumbing in Home (%, log)", "Overcrowding (%)", 
+                            "Ethnic Identy Exploration", "Ethnic Identity Commitment", "Family Obligation", "Family as Referent", "Family Support",
+                            "Indepence/SelfReliance", "Religion", 
+                            "NIHtb Pic Vocab", "NIHtb Flanker", "NIHtb List Sorting", 
+                            "NIHtb Card Sort", "NIHtb Pattern Recognition", "NIHtb Picture", "NIHtb Reading", "RAVLT", "Little Man", "General Cog Ability", 
+                            "Executive Functioning", "Learning/Memory")
 
 abcd_stats_totaltab <- CreateTableOne(data = abcd_stats_total)
 abcd_stats_summarytab <- summary(abcd_stats_totaltab)
@@ -376,8 +402,8 @@ abcd_stats_summarytab <- summary(abcd_stats_totaltab)
 abcd_stats_complete <- abcd_stats_total[complete.cases(abcd_stats_total),]
 
 (abcd_stats_completetab <- CreateTableOne(data = abcd_stats_complete))
-
-write.table(abcd_stats_completetab, file = "abcd_stats_table.txt", sep = ",", quote = FALSE, row.names = FALSE)
+stats_table <- print(abcd_stats_completetab, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(stats_table, file = "abcd_stats_table.csv")
 
 ```
 
@@ -1119,7 +1145,7 @@ rownames(relcomb_corr) <- c("Age", "Male", "White", "Black", "Hispanic", "Asian"
                             "Median Family Income",  "Income Disparity Index", "Median Home Value", "Median Gross Rent", "Median Monthly Mortgage",  
                             "Home Ownership (%)","Unemployed (%)","Families in Poverty (%)", "Below Povery Line (%)","Single/Not Married (%)",
                             "Car Ownership (%, log)", "Telephone in Home (%, log)", "Plumbing in Home (%, log)", "Overcrowding (%)", 
-                            "Ethnic Identy Exploration", "Ethnic Identity Commitment", "Family Obligation", "Family as Referent", "Family Support",
+                            "Ethnic Identity Exploration", "Ethnic Identity Commitment", "Family Obligation", "Family as Referent", "Family Support",
                             "Indepence/SelfReliance", "Religion", "Cog - General Ability", "Cog - Executive Function", "Cog - Learning/Memory")
 
 colnames(relcomb_corr) <- c(rep(" ", 56))
@@ -1771,23 +1797,6 @@ secondrel3_culture_mediation <- mediate(secondrel3_culture_demenviro_patha, seco
 summary(secondrel3_culture_mediation)
 ```
 
-## Adjust p-values for mediation effects using bonferoni correction
-
-```{r}
-
-rel1_padjust <- c(firstrel1_culture_mediation, firstrel2_culture_mediation, firstrel3_culture_mediation,
-                  firstrel1_home_mediation, firstrel2_home_mediation, firstrel3_home_mediation,
-                  firstrel1_school_mediation, firstrel2_school_mediation, firstrel3_school_mediation,
-                  firstrel1_neighborhood_mediation, firstrel2_neighborhood_mediation, firstrel3_neighborhood_mediation) %>%
-  p.adjust(method = "bonferoni", n = 12)
-
-rel2_padjust <- c(secondrel1_culture_mediation, secondrel2_culture_mediation, secondrel3_culture_mediation,
-                  secondrel1_home_mediation, secondrel2_home_mediation, secondrel3_home_mediation,
-                  secondrel1_school_mediation, secondrel2_school_mediation, secondrel3_school_mediation,
-                  secondrel1_neighborhood_mediation, secondrel2_neighborhood_mediation, secondrel3_neighborhood_mediation) %>%
-  p.adjust(method = "bonferoni", n = 12)
-
-```
 
 
 # Reverse models 
@@ -2095,12 +2104,24 @@ rel2_pc_corr <- second_release_data %>%
   dplyr::select(sociodemo_PC1, sociodemo_PC1, sociodemo_PC1, sociodemo_PC1, Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem) %>%
   cor()
 
+rel1_revpc_corr <- first_release_data %>%
+  dplyr::select(home_PC1, school_PC1, neighborhood_PC1, culture_PC1, Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem) %>%
+  cor()
+
+rel2_revpc_corr <- second_release_data %>%
+  dplyr::select(home_PC1, school_PC1, neighborhood_PC1, culture_PC1, Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem) %>%
+  cor()
+
 (corrplot(rel1_pc_corr))
 (corrplot(rel2_pc_corr))
 
 release_pc_corrs <- data.frame(rel1_BPPC1 = rep(rel1_pc_corr[1, 2],4), rel2_BPPC1 = rep(rel2_pc_corr[1, 2],4),
                                rel1_BPPC2 = rep(rel1_pc_corr[1, 3], 4), rel2_BPPC2 = rep(rel2_pc_corr[1, 3],4),
                                rel1_BPPC3 = rel1_pc_corr[1, 4], rel2_BPPC3 = rep(rel2_pc_corr[1, 4], 4))
+
+releaserev_pc_corrs <- data.frame(rel1_BPPC1 = rel1_revpc_corr[1:4, 5], rel2_BPPC1 = rel2_revpc_corr[1:4, 5],
+                               rel1_BPPC2 = rel1_revpc_corr[1:4, 6], rel2_BPPC2 = rel2_revpc_corr[1:4, 6],
+                               rel1_BPPC3 = rel1_revpc_corr[1:4, 7], rel2_BPPC3 = rel2_revpc_corr[1:4,7])
 
 ## Grab and order orrected p-vales for standard and reverse models 
 
@@ -2119,9 +2140,19 @@ png("release_standmed_corrplot.png", res = 600, width = 10000, height = 6000)
                               insig = "label_sig", cl.pos = "r", cl.cex = 1.5, pch.col = "black", pch.cex = 5, tl.pos = "n"))
 dev.off()
 
+png("release_standmed_corrplot_nosig.png", res = 600, width = 10000, height = 6000)
+(release_standmed_corrplot_nosig <- corrplot(as.matrix(release_pc_corrs), method = 'color', col = corr_color2(100), type = "full", 
+                                             cl.pos = "r", cl.cex = 1.5, tl.pos = "n"))
+dev.off()
+
 png("release_revmed_corrplot.png", res = 600, width = 10000, height = 6000)
-(release_revmed_corrplot <- corrplot(as.matrix(release_pc_corrs), method = 'color', col = corr_color2(100), type = "full", p.mat = as.matrix(releaserev_pc_pvals), 
+(release_revmed_corrplot <- corrplot(as.matrix(releaserev_pc_corrs), method = 'color', col = corr_color2(100), type = "full", p.mat = as.matrix(releaserev_pc_pvals), 
                               insig = "label_sig", cl.pos = "r", cl.cex = 1.5, pch.col = "black", pch.cex = 5, tl.pos = "n"))
+dev.off()
+
+png("release_revmed_corrplot_nosig.png", res = 600, width = 10000, height = 6000)
+(release_revmed_corrplot_nosig <- corrplot(as.matrix(releaserev_pc_corrs), method = 'color', col = corr_color2(100), type = "full",
+                                           cl.pos = "r", cl.cex = 1.5, tl.pos = "n"))
 dev.off()
 
 
