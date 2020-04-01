@@ -351,6 +351,8 @@ nmissing_abcd_data_final <- colSums(is.na(abcd_data_final))
 
 abcd_data_final <- abcd_data_final[complete.cases(abcd_data_final),]
 
+write_csv(abcd_data_final, "abcd_data_final.csv")
+
 ```
 
 Create descriptive statistics table with missingness
@@ -488,7 +490,7 @@ SociodemoVar_list <- data.table(c("Age",
 
 set.seed(1992)
 
-nrand <- 1000
+nrand <- 100
 n_sites <- length(unique(abcd_data_final$abcd_site))
 n_site_split <- n_sites/2
 site_list <- as.character(unique(abcd_data_final$abcd_site))
@@ -770,7 +772,7 @@ rel1_home_pccontrib$Contribution[rel1_negative_dir_home] <- -1 * rel1_home_pccon
 (rel1_home_pccontrib_plot <- rel1_home_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_orange) +
-    scale_y_continuous(limits = c(-30, 45)) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
                 ggtitle("Release 1.1 PCA Loadings") +
                 pc_theme_toptitles )
@@ -790,7 +792,7 @@ rel2_home_pccontrib$Contribution[rel2_negative_dir_home] <- -1 * rel2_home_pccon
 (rel2_home_pccontrib_plot <- rel2_home_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_orange) +
-    scale_y_continuous(limits = c(-30, 45)) +
+    scale_y_continuous(limits = c(-35, 40)) +
                 coord_flip() +
                 ggtitle("Release 2.0.1 PCA Loadings") +
                 pc_theme_toptitles )
@@ -811,7 +813,7 @@ rel1_school_pccontrib$Contribution[rel1_negative_dir_school] <- -1 * rel1_school
 (rel1_school_pccontrib_plot <- rel1_school_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_blue) +
-    scale_y_continuous(limits = c(-30, 45)) +
+    #scale_y_continuous(limits = c(-30, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1025,7 +1027,7 @@ rel2_neurocog3_pccontrib$Contribution[rel2_negative_dir_neurocog3] <- -1 * rel2_
 (rel2_neurocog3_pccontrib_plot <- rel2_neurocog3_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
                 geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
-    scale_y_continuous(limits = c(-30, 45)) +
+    scale_y_continuous(limits = c(-30, 50)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1033,6 +1035,7 @@ ggsave("rel2_neurocog3_pccontrib_plot.png")
 
 
 ```
+
 
 ## Combine plots for Release 1 and 2 PCs
 ```{r}
@@ -1049,7 +1052,94 @@ ggsave("rel2_neurocog3_pccontrib_plot.png")
                                rel2_sociodemo_pccontrib_plot,
                                      heights = c(1, 1, 3, 1, 1),
                                      nrow = 5))
-ggsave('relplot_pcfig.png', relplot_pcfig, height = 17, width = 14)
+ggsave('relplot_pcfig2.png', relplot_pcfig, height = 17, width = 14)
+
+a <- list(1, 22, 3, 4 )
+b <- c("a", "b", "c")
+c <- 6
+
+datalist <- list(a, b, c)
+saveRDS(datalist, "test_datalist.RDS")
+
+save(list = c("a", "b", "c"), file = "test_rdata_datalist.RData")
+
+```
+
+## update PC loading figures for mediation model fig 
+
+```{r}
+
+(homepc_icon <- rel2_home_pccontrib_plot +
+  theme(legend.position="none", 
+            panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), 
+            axis.title = element_blank(), 
+            axis.text = element_blank()) +
+   ggtitle(""))
+
+(schoolpc_icon <- rel2_school_pccontrib_plot +
+    theme(legend.position="none", 
+            panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), 
+            axis.title = element_blank(), 
+            axis.text = element_blank()))
+
+(neighborhoodpc_icon <- rel2_neighborhood_pccontrib_plot +
+    scale_y_continuous(limits = c(-10, 10)) +
+  theme(legend.position="none", 
+            panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), 
+            axis.title = element_blank(), 
+            axis.text = element_blank()))
+
+(culturepc_icon <- rel2_culture_pccontrib_plot +
+    scale_y_continuous(limits = c(-20, 25)) +
+  theme(legend.position="none", 
+            panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), 
+            axis.title = element_blank(), 
+            axis.text = element_blank()))
+                               
+(sociodemopc_icon <- rel2_sociodemo_pccontrib_plot +
+     scale_y_continuous(limits = c(-30, 30)) +
+  theme(legend.position="none", 
+            panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), 
+            axis.title = element_blank(), 
+            axis.text = element_blank()))
+
+(neurocogpc1_icon <- rel2_neurocog1_pccontrib_plot +
+     scale_y_continuous(limits = c(-15, 15)) +
+    theme(legend.position="none", 
+            panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), 
+            axis.title = element_blank(), 
+            axis.text = element_blank()))
+
+(neurocogpc2_icon <- rel2_neurocog2_pccontrib_plot +
+     scale_y_continuous(limits = c(-20, 35)) +
+    theme(legend.position="none", 
+            panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), 
+            axis.title = element_blank(), 
+            axis.text = element_blank()))
+
+(neurocogpc3_icon <- rel2_neurocog3_pccontrib_plot +
+    theme(legend.position="none", 
+            panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), 
+            axis.title = element_blank(), 
+            axis.text = element_blank()))
+
+(enviropc_iconfig <- grid.arrange(homepc_icon, schoolpc_icon, neighborhoodpc_icon, culturepc_icon,  
+                                     nrow = 1))
+ggsave('enviropc_iconfig.png', enviropc_iconfig, height = 3, width = 5)
+
+(neuroogpc_iconfig <- grid.arrange(neurocogpc1_icon, neurocogpc2_icon, neurocogpc3_icon,  
+                                     nrow = 1))
+ggsave('neuroogpc_iconfig.png', neuroogpc_iconfig, height = 3, width = 4)
+
+ggsave('sociodemopc_iconfig.png', sociodemopc_icon, height = 3, width = 2)
 
 ```
 
@@ -2352,9 +2442,6 @@ rm(site1_data, site2_data, site1pc1_culture_demenviro_patha, site1pc1_culture_en
    site2pc2_neighborhood_demenviro_patha, site2pc2_neighborhood_envirocog_pathb, site2pc2_school_demenviro_patha, site2pc2_school_envirocog_pathb,
    site2pc3_culture_demenviro_patha, site2pc3_culture_envirocog_pathb, site2pc3_home_demenviro_patha, site2pc3_home_envirocog_pathb,
    site2pc3_neighborhood_demenviro_patha, site2pc3_neighborhood_envirocog_pathb, site2pc3_school_demenviro_patha, site2pc3_school_envirocog_pathb) 
-
-
-
 
 }
 
