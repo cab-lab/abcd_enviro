@@ -17,12 +17,42 @@ Code for:
         
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-library(dplyr); library(ggplot2); library(lme4); library(cvTools);  library(R.matlab); library(summarytools); library(readr);
-library(psych); library(lme4); library(stargazer); library(gvlma);  library(extrafont); library(lattice); library(summarytools);
-library(dplyr); library(ade4);  library(factoextra);  library(magrittr);  library(FactoMineR);  library(tidyr); library(fastDummies);
-library(tidyverse); library(lavaan); library(semPlot); library(FactoMineR); library(factoextra); library(magrittr); library(FactoMineR);
-library(mediation); library(data.table); library(corrplot); library(easystats); library(dplyr); library(Hmisc); library(foreach); library(doParallel);
-library(tableone); library(gridExtra)
+library(dplyr) 
+library(ggplot2) 
+library(lme4)
+library(cvTools)  
+library(R.matlab) 
+library(summarytools) 
+library(readr)
+library(psych) 
+library(lme4) 
+library(stargazer) 
+library(gvlma)  
+library(extrafont) 
+library(lattice)
+library(summarytools)
+library(dplyr)
+library(ade4)  
+library(factoextra)  
+library(magrittr) 
+library(FactoMineR)  
+library(tidyr)
+library(fastDummies)
+library(tidyverse)
+library(FactoMineR) 
+library(factoextra) 
+library(magrittr); 
+library(FactoMineR);
+library(mediation); 
+library(data.table);
+library(corrplot); 
+library(effectsize); 
+library(dplyr); 
+library(Hmisc); 
+library(foreach); 
+#library(doParallel);
+library(tableone); 
+library(gridExtra)
 library(RColorBrewer)
 
 knitr::opts_knit$set(root.dir = "../../../")
@@ -471,9 +501,7 @@ NeurocogVar_list <- data.table(c("NIHtb_PicVocab",
                          "RAVLT",
                          "LMT"), "Neurocog")
 
-SociodemoVar_list <- data.table(c("Age",
-                         "Male",
-                         "White",
+SociodemoVar_list <- data.table(c("White",
                          "Black",
                          "Hispanic",
                          "Asian",
@@ -685,6 +713,71 @@ fviz_screeplot(rel2_neurocog_pca, addlabels =TRUE) +
   ggtitle("Release 2 Neurocog")
 ```
 
+
+## Regress out age and sex 
+
+```{r}
+## first release resids
+X <- as.matrix(first_release_data[c("Age",
+                                "Male")])
+
+Y <- as.matrix(first_release_data[c("culture_PC1", "home_PC1", "school_PC1", "neighborhood_PC1", "neurocog_PC1", "neurocog_PC2",
+                                    "neurocog_PC3", "Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc", "Neurocog_BPPC3_LearnMem")])
+
+
+lm.ControlDem <- lm(Y ~ X, data = first_release_data)
+CombMeasures_allcog_resid <- lm.ControlDem$residuals
+
+
+first_release_data <- first_release_data %>%
+  mutate(culture_PC1 = CombMeasures_allcog_resid[,"culture_PC1"],
+         home_PC1 = CombMeasures_allcog_resid[,"home_PC1"],
+         school_PC1 = CombMeasures_allcog_resid[,"school_PC1"],
+         neighborhood_PC1 = CombMeasures_allcog_resid[,"neighborhood_PC1"],
+         neurocog_PC1 = CombMeasures_allcog_resid[,"neurocog_PC1"],
+         neurocog_PC2 = CombMeasures_allcog_resid[,"neurocog_PC2"],
+         neurocog_PC3 = CombMeasures_allcog_resid[,"neurocog_PC3"],
+         Neurocog_BPPC1_GenAbility = CombMeasures_allcog_resid[,"Neurocog_BPPC1_GenAbility"],
+         Neurocog_BPPC2_ExecFunc = CombMeasures_allcog_resid[,"Neurocog_BPPC2_ExecFunc"],
+         Neurocog_BPPC3_LearnMem = CombMeasures_allcog_resid[,"Neurocog_BPPC3_LearnMem"])
+
+first_release_resid <- first_release_data %>%
+  dplyr::select(subject_id, abcd_site, culture_PC1, home_PC1, school_PC1, neighborhood_PC1, 
+                Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem)
+
+write.csv(first_release_resid, 'ABCD_release1_PCresid.csv', row.names = FALSE)
+
+## second release resids
+X <- as.matrix(second_release_data[c("Age",
+                                "Male")])
+
+Y <- as.matrix(second_release_data[c("culture_PC1", "home_PC1", "school_PC1", "neighborhood_PC1", "neurocog_PC1", "neurocog_PC2",
+                                    "neurocog_PC3", "Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc", "Neurocog_BPPC3_LearnMem")])
+
+
+lm.ControlDem <- lm(Y ~ X, data = second_release_data)
+CombMeasures_allcog_resid <- lm.ControlDem$residuals
+
+
+second_release_data <- second_release_data %>%
+  mutate(culture_PC1 = CombMeasures_allcog_resid[,"culture_PC1"],
+         home_PC1 = CombMeasures_allcog_resid[,"home_PC1"],
+         school_PC1 = CombMeasures_allcog_resid[,"school_PC1"],
+         neighborhood_PC1 = CombMeasures_allcog_resid[,"neighborhood_PC1"],
+         neurocog_PC1 = CombMeasures_allcog_resid[,"neurocog_PC1"],
+         neurocog_PC2 = CombMeasures_allcog_resid[,"neurocog_PC2"],
+         neurocog_PC3 = CombMeasures_allcog_resid[,"neurocog_PC3"],
+         Neurocog_BPPC1_GenAbility = CombMeasures_allcog_resid[,"Neurocog_BPPC1_GenAbility"],
+         Neurocog_BPPC2_ExecFunc = CombMeasures_allcog_resid[,"Neurocog_BPPC2_ExecFunc"],
+         Neurocog_BPPC3_LearnMem = CombMeasures_allcog_resid[,"Neurocog_BPPC3_LearnMem"])
+
+second_release_resid <- second_release_data %>%
+  dplyr::select(subject_id, abcd_site, culture_PC1, home_PC1, school_PC1, neighborhood_PC1, 
+                Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem)
+
+write.csv(second_release_resid, 'ABCD_release2_PCresid.csv', row.names = FALSE)
+
+```
 
 
 ## Plot variable contributions for environment and sociodemographic categories
