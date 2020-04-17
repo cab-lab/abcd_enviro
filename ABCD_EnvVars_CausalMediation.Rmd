@@ -714,7 +714,7 @@ fviz_screeplot(rel2_neurocog_pca, addlabels =TRUE) +
 ```
 
 
-## Regress out age and sex 
+## Regress out age and sex from PC participant loadings
 
 ```{r}
 ## first release resids
@@ -724,7 +724,6 @@ X <- as.matrix(first_release_data[c("Age",
 Y <- as.matrix(first_release_data[c("culture_PC1", "home_PC1", "school_PC1", "neighborhood_PC1", "sociodemo_PC1","neurocog_PC1", "neurocog_PC2",
                                     "neurocog_PC3", "Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc", "Neurocog_BPPC3_LearnMem")])
 
-sociodemo_PC1 = full_sociodemo_pca$ind$coord[,1]
 lm.ControlDem <- lm(Y ~ X, data = first_release_data)
 CombMeasures_allcog_resid <- lm.ControlDem$residuals
 
@@ -778,6 +777,73 @@ second_release_resid <- second_release_data %>%
                 sociodemo_PC1_resid, Neurocog_BPPC1_GenAbility_resid, Neurocog_BPPC2_ExecFunc_resid, Neurocog_BPPC3_LearnMem_resid)
 
 write.csv(second_release_resid, 'ABCD_release2_PCresid.csv', row.names = FALSE)
+
+```
+
+
+## Regress out age and sex from enviro/sociodem vars and compare participant loadings with the regressed loadings above
+```{r}
+# first release
+first_release_varresid_data <- first_release_data %>%
+  dplyr::select(c(Age, Male, CultureEnvVar_list$V1, HomeEnvVar_list$V1, SchoolEnvVar_list$V1, NeighborhoodEnvVar_list$V1, SociodemoVar_list$V1))
+
+X <- as.matrix(first_release_varresid_data[c("Age", "Male")])
+
+Y <- as.matrix(first_release_varresid_data[c(CultureEnvVar_list$V1, HomeEnvVar_list$V1, SchoolEnvVar_list$V1, NeighborhoodEnvVar_list$V1, SociodemoVar_list$V1)])
+
+lm.ControlDem <- lm(Y ~ X, data = first_release_varresid_data)
+CombMeasures_allcog_resid <- lm.ControlDem$residuals
+
+
+rel1_culturevarres_pca     <- PCA(CombMeasures_allcog_resid[,CultureEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel1_homevarres_pca        <- PCA(CombMeasures_allcog_resid[,HomeEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel1_schoolvarres_pca      <- PCA(CombMeasures_allcog_resid[,SchoolEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel1_neighborhoodvarres_pca <- PCA(CombMeasures_allcog_resid[,NeighborhoodEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel1_sociodemovarres_pca    <- PCA(CombMeasures_allcog_resid[,SociodemoVar_list$V1], scale.unit = TRUE, graph = TRUE)
+
+# second release
+second_release_varresid_data <- second_release_data %>%
+  dplyr::select(c(Age, Male, CultureEnvVar_list$V1, HomeEnvVar_list$V1, SchoolEnvVar_list$V1, NeighborhoodEnvVar_list$V1, SociodemoVar_list$V1))
+
+X <- as.matrix(second_release_varresid_data[c("Age", "Male")])
+
+Y <- as.matrix(second_release_varresid_data[c(CultureEnvVar_list$V1, HomeEnvVar_list$V1, SchoolEnvVar_list$V1, NeighborhoodEnvVar_list$V1, SociodemoVar_list$V1)])
+
+lm.ControlDem <- lm(Y ~ X, data = second_release_varresid_data)
+CombMeasures_allcog_resid <- lm.ControlDem$residuals
+
+
+rel2_culturevarres_pca     <- PCA(CombMeasures_allcog_resid[,CultureEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel2_homevarres_pca        <- PCA(CombMeasures_allcog_resid[,HomeEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel2_schoolvarres_pca      <- PCA(CombMeasures_allcog_resid[,SchoolEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel2_neighborhoodvarres_pca <- PCA(CombMeasures_allcog_resid[,NeighborhoodEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel2_sociodemovarres_pca    <- PCA(CombMeasures_allcog_resid[,SociodemoVar_list$V1], scale.unit = TRUE, graph = TRUE)
+                             
+```
+
+## Compare participant loadings from the two PC sets with regressed age and sex
+```{r}
+# release 1 
+(rel1_home_rescor <- cor.test(first_release_data$home_PC1_resid, rel1_homevarres_pca$ind$coord[,1], method = "spearman"))
+
+(rel1_school_rescor <- cor.test(first_release_data$school_PC1_resid, rel1_schoolvarres_pca$ind$coord[,1], method = "spearman"))
+
+(rel1_neighborhood_rescor <- cor.test(first_release_data$neighborhood_PC1_resid, rel1_neighborhoodvarres_pca$ind$coord[,1], method = "spearman"))
+
+(rel1_culture_rescor <- cor.test(first_release_data$culture_PC1_resid, rel1_culturevarres_pca$ind$coord[,1], method = "spearman"))
+
+(rel1_sociodemo_rescor <- cor.test(first_release_data$sociodemo_PC1_resid, rel1_sociodemovarres_pca$ind$coord[,1], method = "spearman"))
+
+# release 2 
+(rel2_home_rescor <- cor.test(second_release_data$home_PC1_resid, rel2_homevarres_pca$ind$coord[,1], method = "spearman"))
+
+(rel2_school_rescor <- cor.test(second_release_data$school_PC1_resid, rel2_schoolvarres_pca$ind$coord[,1], method = "spearman"))
+
+(rel2_neighborhood_rescor <- cor.test(second_release_data$neighborhood_PC1_resid, rel2_neighborhoodvarres_pca$ind$coord[,1], method = "spearman"))
+
+(rel2_culture_rescor <- cor.test(second_release_data$culture_PC1_resid, rel2_culturevarres_pca$ind$coord[,1], method = "spearman"))
+
+(rel2_sociodemo_rescor <- cor.test(second_release_data$sociodemo_PC1_resid, rel2_sociodemovarres_pca$ind$coord[,1], method = "spearman"))
 
 ```
 
@@ -1238,6 +1304,44 @@ ggsave('sociodemopc_iconfig.png', sociodemopc_icon, height = 3, width = 2)
 
 ```
 
+## Correlation matrix for Release 1 and 2 PCs
+
+```{r}
+corr_color <- rev(brewer.pal(4, "RdBu"))
+
+corr_color2 <- colorRampPalette(c(corr_color[1:2], "white", corr_color[3:4]))
+
+## Release 1.1 and Release 2.0.1  corr plot 
+
+rel1pc_corr <- cor(first_release_data[, c(86, 77:79, 76, 83:85)])
+rel2pc_corr <- cor(second_release_data[, c(86, 77:79, 76, 83:85)])
+
+relcombpc_corr <- matrix(NA, nrow = 8, ncol = 8)
+relcombpc_corr[lower.tri(relcombpc_corr)] <- rel1pc_corr[lower.tri(rel1pc_corr)]
+relcombpc_corr[upper.tri(relcombpc_corr)] <- rel2pc_corr[upper.tri(rel2pc_corr)]
+diag(relcombpc_corr) <-  0
+
+rel1pc_corr_pvals <- cor.mtest(first_release_data[, c(86, 77:79, 76, 83:85)], method = "spearman")
+rel2pc_corr_pvals <- cor.mtest(second_release_data[,  c(86, 77:79, 76, 83:85)], method = "spearman")
+
+relcompc_corr_pvals <- matrix(NA, nrow = 8, ncol = 8)
+relcompc_corr_pvals[lower.tri(relcompc_corr_pvals)] <- rel1pc_corr_pvals$p[lower.tri(rel1pc_corr_pvals$p)]
+relcompc_corr_pvals[upper.tri(relcompc_corr_pvals)] <- rel2pc_corr_pvals$p[upper.tri(rel2pc_corr_pvals$p)]
+diag(relcompc_corr_pvals) <- 0
+
+rownames(relcombpc_corr) <- c("Sociodemo_PC", "Home_PC", "School_PC", "Neighborhood_PC", "Culture_PC", "BPPC1_GenAbility", "BPPC2_ExecFunc",
+                              "BPPC3_LearnMem")
+colnames(relcombpc_corr) <- c("Sociodemo", "Home", "School", "Neigh", "Culture", "GenAbil", "ExecFunc",
+                              "LearnMem")
+#colnames(relcombpc_corr) <- c(rep(" ", 8))
+
+png("relcompc_corrplot.png", res = 700, width = 16000, height = 12000)
+(pc_corrplot <- corrplot(relcombpc_corr, method = 'color', col = corr_color2(100), type = "full", addCoef.col = "black", number.cex = 2, diag = FALSE, cl.pos = "r", cl.cex = 1.8, tl.cex = 1.8, tl.col = "black", tl.srt = 0))
+#corrRect(c(9, 4, 3, 30, 7, 3), col = c(color_grey, color_orange, color_blue, color_green, color_red, color_teal), lwd = 6)
+dev.off()
+
+```
+
 
 ## glms for three cog BPPCs
 
@@ -1295,6 +1399,7 @@ summary(learnmem_rel1_model)
 
 summary(learnmem_rel2_model)
 ```
+
 ## GLMS for each environment separately 
 
 ```{r}
@@ -1393,9 +1498,6 @@ summary(learnmem_culturerel2_model)
 library(lmerTest)
 library(optimx)
 
-# m.high <- lmer(high ~ state_factor + (1 | dataset/subject), data=d, verbose=FALSE,
-#                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
 ## General ability
 genabil_homerel1_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = first_release_data,
                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
@@ -1462,8 +1564,61 @@ learnmem_culturerel2_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_
 
 ```
 
-## Compare PC loadings with and without regressed covariates 
+##Summary for General Ability mixed effects models
+```{r}
 
+summary(genabil_homerel1_mixmodel)
+summary(genabil_homerel2_mixmodel)
+
+summary(genabil_schoolrel1_mixmodel)
+summary(genabil_schoolrel2_mixmodel)
+
+summary(genabil_neighborhoodrel1_mixmodel)
+summary(genabil_neighborhoodrel2_mixmodel)
+
+summary(genabil_culturerel1_mixmodel)
+summary(genabil_culturerel2_mixmodel)
+
+```
+
+
+## Summary for Exec Func mixed effects model
+```{r}
+
+summary(execfunc_homerel1_mixmodel)
+summary(execfunc_homerel2_mixmodel)
+
+summary(execfunc_schoolrel1_mixmodel)
+summary(execfunc_schoolrel2_mixmodel)
+
+summary(execfunc_neighborhoodrel1_mixmodel)
+summary(execfunc_neighborhoodrel2_mixmodel)
+
+summary(execfunc_culturerel1_mixmodel)
+summary(execfunc_culturerel2_mixmodel)
+
+```
+
+
+## Summary for Learn/Mem mixed effects model
+```{r}
+
+summary(learnmem_homerel1_mixmodel)
+summary(learnmem_homerel2_mixmodel)
+
+summary(learnmem_schoolrel1_mixmodel)
+summary(learnmem_schoolrel2_mixmodel)
+
+summary(learnmem_neighborhoodrel1_mixmodel)
+summary(learnmem_neighborhoodrel2_mixmodel)
+
+summary(learnmem_culturerel1_mixmodel)
+summary(learnmem_culturerel2_mixmodel)
+
+```
+
+
+## Compare PC loadings with and without regressed covariates 
 ```{r}
 #release 1
 (home1_covar_corr <- cor.test(first_release_data$home_PC1, first_release_data$home_PC1_resid, method = "spearman"))
