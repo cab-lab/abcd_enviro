@@ -17,7 +17,6 @@ Code for:
 knitr::opts_chunk$set(echo = FALSE)
 library(dplyr) 
 library(ggplot2) 
-library(lme4)
 library(cvTools)  
 library(R.matlab) 
 library(summarytools) 
@@ -40,7 +39,7 @@ library(FactoMineR)
 library(factoextra) 
 library(magrittr); 
 library(FactoMineR);
-library(mediation); 
+#library(mediation); 
 library(data.table);
 library(corrplot); 
 library(effectsize); 
@@ -50,6 +49,9 @@ library(foreach);
 library(tableone); 
 library(gridExtra)
 library(RColorBrewer)
+library(lmerTest)
+library(optimx)
+library(broom)
 
 
 knitr::opts_knit$set(root.dir = "../../../")
@@ -71,78 +73,38 @@ summary(acculturation_table)
 
 ```
 
-# 1. Import DEAP Rds file and set up working directories
+# 1. Import DEAP Rds file and set up working directories, get subject IDs for Release 1
 ```{r import_data}
 
 abcd_data <- read_rds("~/Documents/data/release2rds/results/ABCD_release2.0.1_update_Rds/nda2.0.1.Rds") %>%
   filter(eventname == "baseline_year_1_arm_1") %>%
-  dplyr::select(subjectid,
-         abcd_site,
-         rel_family_id,
-         age,
-         demo_gender_id_p,
-         demo_sex_p,
-         female,
-         race_ethnicity,
-         demo_comb_income_p,#SES
-         demo_prnt_ed_p,
-         demo_prtnr_ed_p,
-         meim_ss_exp_p,
-         meim_ss_com_p,
-         macvs_ss_fo_p,
-         macvs_ss_fr_p,
-         macvs_ss_fs_p,           
-         macvs_ss_isr_p,           
-         macvs_ss_r_p,
-         fes_ss_fc_p_pr, #home env
-         parental_monitoring_ss_mean,
-         fes_ss_fc_pr,
-         crpbi_acceptance_ss_studycaregiver,
-         school_risk_phenx_ss_ses,#school env school_risk_phenx_ss_ses
-         school_risk_phenx_ss_iiss, # school_risk_phenx_ss_iiss
-         school_risk_phenx_ss_dfs, # school_risk_phenx_ss_dfs
-         neighb_phenx_ss_mean_p, #neighborhood
-         neighb_phenx,
-         reshist_addr1_walkindex,
-         reshist_addr1_no2,
-         reshist_addr1_pm25,
-         reshist_addr1_proxrd,
-         reshist_addr1_d1a,
-         reshist_addr1_p1vlnt, 
-         reshist_addr1_drugtot, 
-         reshist_addr1_drgsale, 
-         reshist_addr1_drgposs, 
-         reshist_addr1_dui,
-         reshist_addr1_mjsale,
-         reshist_addr1_adi_edu_l,
-         reshist_addr1_adi_edu_h,
-         reshist_addr1_adi_work_c,
-         reshist_addr1_adi_income,
-         reshist_addr1_adi_in_dis,
-         reshist_addr1_adi_home_v,
-         reshist_addr1_adi_rent,
-         reshist_addr1_adi_mortg,
-         reshist_addr1_adi_home_o,
-         reshist_addr1_adi_unemp,
-         reshist_addr1_adi_pov,
-         reshist_addr1_adi_b138,
-         reshist_addr1_adi_sp,
-         reshist_addr1_adi_ncar,
-         reshist_addr1_adi_ntel, 
-         reshist_addr1_adi_nplumb, 
-         reshist_addr1_adi_crowd,
-         nihtbx_picvocab_uncorrected, nihtbx_flanker_uncorrected, nihtbx_list_uncorrected, nihtbx_cardsort_uncorrected, 
-         nihtbx_pattern_uncorrected, nihtbx_picture_uncorrected, nihtbx_reading_uncorrected, pea_ravlt_sd_trial_i_tc,
-         pea_ravlt_sd_trial_ii_tc, pea_ravlt_sd_trial_iii_tc, pea_ravlt_sd_trial_iv_tc, pea_ravlt_sd_trial_v_tc, lmt_scr_perc_correct,
-         neurocog_pc1.bl,
-         neurocog_pc2.bl,
-         neurocog_pc3.bl)
+  dplyr::select(subjectid, abcd_site, rel_family_id,age, demo_gender_id_p, demo_sex_p, female, race_ethnicity, #general participant info/ sociodemo 
+                demo_comb_income_p,demo_prnt_ed_p, demo_prtnr_ed_p, 
+                meim_ss_exp_p, meim_ss_com_p, macvs_ss_fo_p, macvs_ss_fr_p, macvs_ss_fs_p, macvs_ss_isr_p, macvs_ss_r_p, #culture environment
+                fes_ss_fc_p_pr, parental_monitoring_ss_mean, fes_ss_fc_pr, crpbi_acceptance_ss_studycaregiver, # home environment
+                school_risk_phenx_ss_ses, school_risk_phenx_ss_iiss, school_risk_phenx_ss_dfs, #school environment
+                neighb_phenx_ss_mean_p, neighb_phenx, reshist_addr1_walkindex, reshist_addr1_no2, reshist_addr1_pm25, #neighborhood environment
+                reshist_addr1_proxrd,reshist_addr1_d1a, reshist_addr1_p1vlnt, reshist_addr1_drugtot, reshist_addr1_drgsale, 
+                reshist_addr1_drgposs, reshist_addr1_dui, reshist_addr1_mjsale, reshist_addr1_adi_edu_l, reshist_addr1_adi_edu_h, 
+                reshist_addr1_adi_work_c, reshist_addr1_adi_income, reshist_addr1_adi_in_dis, reshist_addr1_adi_home_v,
+                reshist_addr1_adi_rent, reshist_addr1_adi_mortg, reshist_addr1_adi_home_o, reshist_addr1_adi_unemp,
+                reshist_addr1_adi_pov, reshist_addr1_adi_b138, reshist_addr1_adi_sp, reshist_addr1_adi_ncar,
+                reshist_addr1_adi_ntel, reshist_addr1_adi_nplumb,  reshist_addr1_adi_crowd,
+                nihtbx_picvocab_uncorrected, nihtbx_flanker_uncorrected, nihtbx_list_uncorrected, nihtbx_cardsort_uncorrected, # cog behavioral scores
+                nihtbx_pattern_uncorrected, nihtbx_picture_uncorrected, nihtbx_reading_uncorrected, pea_ravlt_sd_trial_i_tc,
+                pea_ravlt_sd_trial_ii_tc, pea_ravlt_sd_trial_iii_tc, pea_ravlt_sd_trial_iv_tc, pea_ravlt_sd_trial_v_tc, lmt_scr_perc_correct,
+                neurocog_pc1.bl, neurocog_pc2.bl, neurocog_pc3.bl # cog BPPCs
+                )
 
 ind_pea_ravlt = c(which(names(abcd_data)=="pea_ravlt_sd_trial_i_tc"),which(names(abcd_data)=="pea_ravlt_sd_trial_ii_tc"),
 	which(names(abcd_data)=="pea_ravlt_sd_trial_iii_tc"),which(names(abcd_data)=="pea_ravlt_sd_trial_iv_tc"),
 	which(names(abcd_data)=="pea_ravlt_sd_trial_v_tc"))
 
 abcd_data$pea_ravlt_ld = apply(abcd_data[,ind_pea_ravlt],1,sum)
+
+first_release_subjects <- read.delim("/Users/wesleymeredith/Documents/data/ABCD1.1/acspsw02.txt", na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>%
+  slice(-1) %>% 
+  dplyr::select(src_subject_id)
 ```
 
 ## dummy variables for sex and race/ethnicity; convert age to years; convert environment factor variables to continuous variables 
@@ -323,8 +285,10 @@ colnames(abcd_data_final) <- c("subject_id",  "abcd_site", "family_id",  "Age", 
 nmissing_abcd_data_final <- colSums(is.na(abcd_data_final))
 
 abcd_data_final <- abcd_data_final[complete.cases(abcd_data_final),]
-
 write_csv(abcd_data_final, "abcd_data_final.csv")
+
+abcd_data_final_loginc <- abcd_data_final %>%
+  mutate(Income = log(Income))
 
 ```
 
@@ -332,7 +296,7 @@ write_csv(abcd_data_final, "abcd_data_final.csv")
 ```{r}
 
 abcd_stats_total <- abcd_data %>%
-  dplyr::select(abcd_site, age, male, race_ethnicity, household.income_num, highest.education, 
+  dplyr::select(subjectid, abcd_site, age, male, race_ethnicity, household.income_num, highest.education, 
                 #home 
          fes_ss_fc_p_pr, parental_monitoring_ss_mean, fes_ss_fc_pr, crpbi_acceptance_ss_studycaregiver,
          #school
@@ -353,7 +317,7 @@ abcd_stats_total <- abcd_data %>%
   mutate(male = factor(male, levels = c(0,1), labels = c("female", "male")))
 
 
-colnames(abcd_stats_total) <- c("ABCD Site", "Age", "Sex", "Race/Ethnicity", "Household Income", "Caregiver Education", 
+colnames(abcd_stats_total) <- c("Subject_ID", "ABCD Site", "Age", "Sex", "Race/Ethnicity", "Household Income", "Caregiver Education", 
                             
                             "Family Conflict (Parent)","Parent Monitoring", "Family Conflict (Youth)", "Parent Acceptance", 
                             
@@ -371,14 +335,36 @@ colnames(abcd_stats_total) <- c("ABCD Site", "Age", "Sex", "Race/Ethnicity", "Ho
                             "NIHtb Card Sort", "NIHtb Pattern Recognition", "NIHtb Picture", "NIHtb Reading", "RAVLT", "Little Man", "General Cog Ability", 
                             "Executive Functioning", "Learning/Memory")
 
-abcd_stats_totaltab <- CreateTableOne(data = abcd_stats_total)
-abcd_stats_summarytab <- summary(abcd_stats_totaltab)
+abcd_stats_total_rel1 <- abcd_stats_total %>%
+  filter(Subject_ID %in% first_release_subjects[[1]]) %>%
+  dplyr::select(2:ncol(abcd_stats_total))
 
-abcd_stats_complete <- abcd_stats_total[complete.cases(abcd_stats_total),]
+abcd_stats_total_rel2 <- abcd_stats_total %>%
+  filter(Subject_ID %nin% first_release_subjects[[1]]) %>%
+  dplyr::select(2:ncol(abcd_stats_total))
 
-(abcd_stats_completetab <- CreateTableOne(data = abcd_stats_complete))
-stats_table <- print(abcd_stats_completetab, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
-write.csv(stats_table, file = "abcd_stats_table.csv")
+abcd_stats_totaltab_rel1 <- CreateTableOne(data = abcd_stats_total_rel1)
+abcd_stats_summarytab_rel1 <- summary(abcd_stats_totaltab_rel1)
+sink("abcd_missing_table_rel1.txt")
+print(summary(abcd_stats_totaltab_rel1), quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+sink()
+
+test <- data.frame(unclass(summary(abcd_stats_totaltab_rel1)), check.names = FALSE, stringsAsFactors = FALSE)
+
+abcd_stats_totaltab_rel2 <- CreateTableOne(data = abcd_stats_total_rel2)
+abcd_stats_summarytab_rel2 <- summary(abcd_stats_totaltab_rel2)
+write.csv(abcd_stats_summarytab_rel2, file = "abcd_missing_table_rel2.csv")
+
+abcd_stats_rel1_complete <- abcd_stats_total_rel1[complete.cases(abcd_stats_total_rel1),]
+abcd_stats_rel2_complete <- abcd_stats_total_rel2[complete.cases(abcd_stats_total_rel2),]
+
+(abcd_stats_completetab_rel1 <- CreateTableOne(data = abcd_stats_rel1_complete))
+stats_table_rel1 <- print(abcd_stats_completetab_rel1, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(stats_table_rel1, file = "abcd_stats_table_rel1.csv")
+
+(abcd_stats_completetab_rel2 <- CreateTableOne(data = abcd_stats_rel2_complete))
+stats_table_rel2 <- print(abcd_stats_completetab_rel2, quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+write.csv(stats_table_rel2, file = "abcd_stats_table_rel2.csv")
 
 ```
 
@@ -410,10 +396,6 @@ SociodemoVar_list <- data.table(c("White", "Black", "Hispanic", "Asian", "Other"
 ## Create subject splits based on release (1.1 and 2.0.1) and single family member subset
 ```{r split_groups}
 
-first_release_subjects <- read.delim("/Users/wesleymeredith/Documents/data/ABCD1.1/acspsw02.txt", na.strings=c(""," ","NA"), stringsAsFactors=FALSE) %>%
-  slice(-1) %>% 
-  dplyr::select(src_subject_id) 
-
 first_release_data <- abcd_data_final %>%
   filter(subject_id %in% first_release_subjects[[1]]) %>%
   standardize()
@@ -430,34 +412,26 @@ second_release_bppca <- abcd_data_final %>%
   filter(subject_id %nin% first_release_subjects[[1]]) %>%
   dplyr::select(Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem)
 
-## create a single family member reduced sample
 
-family_idx <- data.frame()
-for (i in abcd_data_final$family_id) {
-  tmp_ids <- (which(abcd_data_final$family_id %in% i))
-  family_idx <- rbind(tmp_ids[1],family_idx)
-  rm(tmp_ids)
+## create site splits 
+
+set.seed(1992)
+
+nrand <- 100
+n_sites <- length(unique(abcd_data_final$abcd_site))
+n_site_split <- n_sites/2
+site_list <- as.character(unique(abcd_data_final$abcd_site))
+site_splits_rand <- data.frame(matrix(nrow = n_site_split, ncol = nrand))
+
+for (i in 1:nrand){
+  tmp_sitesplit <- sample(site_list, n_site_split, replace = FALSE, prob = NULL)
+  site_splits_rand[,i] <- tmp_sitesplit
+
+  rm(tmp_sitesplit)
 }
-family_idx  <- unique(family_idx)
-abcd_data_family <- abcd_data_final[family_idx$X1L, ]
-
-first_release_family <- abcd_data_family %>% 
-  filter(subject_id %in% first_release_subjects[[1]]) %>%
-  standardize()
-
-first_release_family_bppca <- abcd_data_family %>%
-  filter(subject_id %in% first_release_subjects[[1]]) %>%
-  dplyr::select(Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem)
-  
-second_release_family <- abcd_data_family %>% 
-  filter(subject_id %nin% first_release_subjects[[1]]) %>%
-  standardize()
-
-second_release_family_bppca <- abcd_data_family %>%
-  filter(subject_id %nin% first_release_subjects[[1]]) %>%
-  dplyr::select(Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem)
 
 ```
+
 
 # 3. Run PCA for environmental factors, sociodemographic factors, and neurocognitive scores- full and split samples
 ```{r message=FALSE, warning=FALSE}
@@ -537,6 +511,116 @@ second_release_data <- second_release_data %>%
 write_csv(second_release_data,
           "/Users/wesleymeredith/Documents/github_repos/shared_abcd_enviro/abcd_enviro/enviro_output/abcd_enviro_secondrelease.csv")
 
+## Random site groups 1 and 2 PCAs 
+site1_culture_PC_list <- vector("list", nrand)
+site1_home_PC_list <- vector("list", nrand)
+site1_school_PC_list <- vector("list", nrand)
+site1_neighborhood_PC_list <- vector("list", nrand)
+site1_sociodemo_PC_list <- vector("list", nrand)
+
+site2_culture_PC_list <- vector("list", nrand)
+site2_home_PC_list <- vector("list", nrand)
+site2_school_PC_list <- vector("list", nrand)
+site2_neighborhood_PC_list <- vector("list", nrand)
+site2_sociodemo_PC_list <- vector("list", nrand)
+
+for (i in 1:nrand){
+
+  site1_data <- abcd_data_final %>%
+    filter(abcd_site %in% site_splits_rand[,i]) %>%
+    standardize()
+
+  site2_data <- abcd_data_final %>%
+    filter(abcd_site %nin% site_splits_rand[,i]) %>%
+    standardize()
+
+  site1_culture_PC_list[[i]]    <- PCA(site1_data[CultureEnvVar_list$V1], scale.unit = TRUE, graph = FALSE)
+  site1_home_PC_list[[i]]    <- PCA(site1_data[HomeEnvVar_list$V1], scale.unit = TRUE, graph = FALSE)
+  site1_school_PC_list[[i]]    <- PCA(site1_data[SchoolEnvVar_list$V1], scale.unit = TRUE, graph = FALSE)
+  site1_neighborhood_PC_list[[i]]    <- PCA(site1_data[NeighborhoodEnvVar_list$V1], scale.unit = TRUE, graph = FALSE)
+  site1_sociodemo_PC_list[[i]]    <- PCA(site1_data[SociodemoVar_list$V1], scale.unit = TRUE, graph = FALSE)
+
+  site2_culture_PC_list[[i]]    <- PCA(site2_data[CultureEnvVar_list$V1], scale.unit = TRUE, graph = FALSE)
+  site2_home_PC_list[[i]]    <- PCA(site2_data[HomeEnvVar_list$V1], scale.unit = TRUE, graph = FALSE)
+  site2_school_PC_list[[i]]    <- PCA(site2_data[SchoolEnvVar_list$V1], scale.unit = TRUE, graph = FALSE)
+  site2_neighborhood_PC_list[[i]]    <- PCA(site2_data[NeighborhoodEnvVar_list$V1], scale.unit = TRUE, graph = FALSE)
+  site2_sociodemo_PC_list[[i]]    <- PCA(site2_data[SociodemoVar_list$V1], scale.unit = TRUE, graph = FALSE)
+
+}
+
+#Gather variable loadings for each site split
+site1_culture_varload <- data.frame(matrix(NA, nrow = 7, ncol = 100), row.names = CultureEnvVar_list$V1)
+site1_home_varload <- data.frame(matrix(NA, nrow = 4, ncol = 100), row.names = HomeEnvVar_list$V1)
+site1_school_varload <- data.frame(matrix(NA, nrow = 3, ncol = 100), row.names = SchoolEnvVar_list$V1)
+site1_neighborhood_varload <- data.frame(matrix(NA, nrow = 30, ncol = 100), row.names = NeighborhoodEnvVar_list$V1)
+site1_sociodemo_varload <- data.frame(matrix(NA, nrow = 7, ncol = 100), row.names = SociodemoVar_list$V1)
+
+site2_culture_varload <- data.frame(matrix(NA, nrow = 7, ncol = 100), row.names = CultureEnvVar_list$V1)
+site2_home_varload <- data.frame(matrix(NA, nrow = 4, ncol = 100), row.names = HomeEnvVar_list$V1)
+site2_school_varload <- data.frame(matrix(NA, nrow = 3, ncol = 100), row.names = SchoolEnvVar_list$V1)
+site2_neighborhood_varload <- data.frame(matrix(NA, nrow = 30, ncol = 100), row.names = NeighborhoodEnvVar_list$V1)
+site2_sociodemo_varload <- data.frame(matrix(NA, nrow = 7, ncol = 100), row.names = SociodemoVar_list$V1)
+
+for (i in 1:nrand){
+  site1_culture_varload[,i] <- site1_culture_PC_list[[i]]$var$contrib[,1]
+  site1_home_varload[,i] <- site1_home_PC_list[[i]]$var$contrib[,1]
+  site1_school_varload[,i] <- site1_school_PC_list[[i]]$var$contrib[,1]
+  site1_neighborhood_varload[,i] <- site1_neighborhood_PC_list[[i]]$var$contrib[,1]
+  site1_sociodemo_varload[,i] <- site1_sociodemo_PC_list[[i]]$var$contrib[,1]
+  
+  site2_culture_varload[,i] <- site2_culture_PC_list[[i]]$var$contrib[,1]
+  site2_home_varload[,i] <- site2_home_PC_list[[i]]$var$contrib[,1]
+  site2_school_varload[,i] <- site2_school_PC_list[[i]]$var$contrib[,1]
+  site2_neighborhood_varload[,i] <- site2_neighborhood_PC_list[[i]]$var$contrib[,1]
+  site2_sociodemo_varload[,i] <- site2_sociodemo_PC_list[[i]]$var$contrib[,1]
+  
+}
+
+#grab the variance explained for site split PCS
+site1_home_variance <- c(rep(NA, 100))
+site1_school_variance <- c(rep(NA, 100))
+site1_neighborhood_variance <- c(rep(NA, 100))
+site1_culture_variance <- c(rep(NA, 100))
+site1_sociodemo_variance <- c(rep(NA, 100))
+
+site2_home_variance <- c(rep(NA, 100))
+site2_school_variance <- c(rep(NA, 100))
+site2_neighborhood_variance <- c(rep(NA, 100))
+site2_culture_variance <- c(rep(NA, 100))
+site2_sociodemo_variance <- c(rep(NA, 100))
+
+for (i in 1:nrand){
+  site1_home_variance[i] <- site1_home_PC_list[[i]]$eig[1,2]
+site1_school_variance[i] <- site1_school_PC_list[[i]]$eig[1,2]
+site1_neighborhood_variance[i] <- site1_neighborhood_PC_list[[i]]$eig[1,2]
+site1_culture_variance[i] <- site1_culture_PC_list[[i]]$eig[1,2]
+site1_sociodemo_variance[i] <- site1_sociodemo_PC_list[[i]]$eig[1,2]
+
+site2_home_variance[i] <- site2_home_PC_list[[i]]$eig[1,2]
+site2_school_variance[i] <- site2_school_PC_list[[i]]$eig[1,2]
+site2_neighborhood_variance[i] <- site2_neighborhood_PC_list[[i]]$eig[1,2]
+site2_culture_variance[i] <- site2_culture_PC_list[[i]]$eig[1,2]
+site2_sociodemo_variance[i] <- site2_sociodemo_PC_list[[i]]$eig[1,2]
+}
+
+site1_home_avgvariance <- mean(site1_home_variance)
+site1_school_avgvariance <- mean(site1_school_variance)
+site1_neighborhood_avgvariance <- mean(site1_neighborhood_variance)
+site1_culture_avgvariance <- mean(site1_culture_variance)
+site1_sociodemo_avgvariance <- mean(site1_sociodemo_variance)
+
+site2_home_avgvariance <- mean(site2_home_variance)
+site2_school_avgvariance <- mean(site2_school_variance)
+site2_neighborhood_avgvariance <- mean(site2_neighborhood_variance)
+site2_culture_avgvariance <- mean(site2_culture_variance)
+site2_sociodemo_avgvariance <- mean(site2_sociodemo_variance)
+
+(sitesplit_home_avgvariance <- mean(site1_home_avgvariance, site2_home_avgvariance))
+(sitesplit_school_avgvariance <- mean(site1_school_avgvariance, site2_school_avgvariance))
+(sitesplit_neighborhood_avgvariance <- mean(site1_neighborhood_avgvariance, site2_neighborhood_avgvariance))
+(sitesplit_culture_avgvariance <- mean(site1_culture_avgvariance, site2_culture_avgvariance))
+(sitesplit_sociodemo_avgvariance <- mean(site1_sociodemo_avgvariance, site2_sociodemo_avgvariance))
+
 ```
 
 ## Scree plots for Release 1 and Release 2 groups 
@@ -571,86 +655,7 @@ fviz_screeplot(rel2_neurocog_pca, addlabels =TRUE) +
   ggtitle("Release 2 Neurocog")
 ```
 
-## PCA for family subsets of full sample, first release and second release 
-```{r}
 
-## full sample PCAs
-full_sample_family <- abcd_data_family %>% standardize()
-
-fullfamily_culture_pca     <- PCA(full_sample_family[CultureEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-fullfamily_home_pca        <- PCA(full_sample_family[HomeEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-fullfamily_school_pca      <- PCA(full_sample_family[SchoolEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-fullfamily_neighborhood_pca <- PCA(full_sample_family[NeighborhoodEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-fullfamily_sociodemo_pca    <- PCA(full_sample_family[SociodemoVar_list$V1], scale.unit = TRUE, graph = TRUE)
-fullfamily_neurocog_pca    <- PCA(full_sample_family[NeurocogVar_list$V1], scale.unit = TRUE, graph = TRUE)
-
-full_sample_family <- full_sample_family %>%
-        mutate(culture_PC1 = -1 *fullfamily_culture_pca$ind$coord[,1],
-               home_PC1 = fullfamily_home_pca$ind$coord[,1],
-               school_PC1 = fullfamily_school_pca$ind$coord[,1],
-               neighborhood_PC1 = -1 *fullfamily_neighborhood_pca$ind$coord[,1],
-               sociodemo_PC1 = fullfamily_sociodemo_pca$ind$coord[,1],
-               neurocog_PC1 = fullfamily_neurocog_pca$ind$coord[,1],
-               neurocog_PC2 = fullfamily_neurocog_pca$ind$coord[,2],
-               neurocog_PC3 = fullfamily_neurocog_pca$ind$coord[,3],
-               Neurocog_BPPC1_GenAbility = abcd_data_family$Neurocog_BPPC1_GenAbility,
-               Neurocog_BPPC2_ExecFunc = abcd_data_family$Neurocog_BPPC2_ExecFunc,
-               Neurocog_BPPC3_LearnMem = abcd_data_family$Neurocog_BPPC3_LearnMem)
-
-write_csv(full_sample_family,
-          "/Users/wesleymeredith/Documents/github_repos/shared_abcd_enviro/abcd_enviro/enviro_output/abcd_enviro_fullfamily.csv")
-
-## Release 1 and Release 2 group PCAs
-
-## Release 1
-rel1family_culture_pca     <- PCA(first_release_family[CultureEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-rel1family_home_pca        <- PCA(first_release_family[HomeEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-rel1family_school_pca      <- PCA(first_release_family[SchoolEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-rel1family_neighborhood_pca <- PCA(first_release_family[NeighborhoodEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-rel1family_sociodemo_pca    <- PCA(first_release_family[SociodemoVar_list$V1], scale.unit = TRUE, graph = TRUE)
-rel1family_neurocog_pca    <- PCA(first_release_family[NeurocogVar_list$V1], scale.unit = TRUE, graph = TRUE)
-
-first_release_family <- first_release_family %>%
-        mutate(culture_PC1 = -1 * rel1family_culture_pca$ind$coord[,1],
-               home_PC1 = rel1family_home_pca$ind$coord[,1],
-               school_PC1 = rel1family_school_pca$ind$coord[,1],
-               neighborhood_PC1 = -1 * rel1family_neighborhood_pca$ind$coord[,1],
-               sociodemo_PC1 = rel1family_sociodemo_pca$ind$coord[,1],
-               neurocog_PC1 = rel1family_neurocog_pca$ind$coord[,1],
-               neurocog_PC2 = rel1family_neurocog_pca$ind$coord[,2],
-               neurocog_PC3 = rel1family_neurocog_pca$ind$coord[,3], 
-               Neurocog_BPPC1_GenAbility = first_release_family_bppca$Neurocog_BPPC1_GenAbility,
-               Neurocog_BPPC2_ExecFunc = first_release_family_bppca$Neurocog_BPPC2_ExecFunc,
-               Neurocog_BPPC3_LearnMem = first_release_family_bppca$Neurocog_BPPC3_LearnMem)
-
-write_csv(first_release_family,
-          "/Users/wesleymeredith/Documents/github_repos/shared_abcd_enviro/abcd_enviro/enviro_output/abcd_enviro_firstrelfamily.csv")
-
-## Release 2 
-rel2family_culture_pca     <- PCA(second_release_family[CultureEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-rel2family_home_pca        <- PCA(second_release_family[HomeEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-rel2family_school_pca      <- PCA(second_release_family[SchoolEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-rel2family_neighborhood_pca <- PCA(second_release_family[NeighborhoodEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-rel2family_sociodemo_pca    <- PCA(second_release_family[SociodemoVar_list$V1], scale.unit = TRUE, graph = TRUE)
-rel2family_neurocog_pca         <- PCA(second_release_family[NeurocogVar_list$V1], scale.unit = TRUE, graph = TRUE)
-
-second_release_family <- second_release_family %>%
-        mutate(culture_PC1 = -1 * rel2family_culture_pca$ind$coord[,1],
-               home_PC1 = rel2family_home_pca$ind$coord[,1],
-               school_PC1 = rel2family_school_pca$ind$coord[,1],
-               neighborhood_PC1 = -1 * rel2family_neighborhood_pca$ind$coord[,1],
-               sociodemo_PC1 = rel2family_sociodemo_pca$ind$coord[,1],
-               neurocog_PC1 = rel2family_neurocog_pca$ind$coord[,1],
-               neurocog_PC2 = rel2family_neurocog_pca$ind$coord[,2],
-               neurocog_PC3 = rel2family_neurocog_pca$ind$coord[,3],
-               Neurocog_BPPC1_GenAbility = second_release_family_bppca$Neurocog_BPPC1_GenAbility,
-               Neurocog_BPPC2_ExecFunc = second_release_family_bppca$Neurocog_BPPC2_ExecFunc,
-               Neurocog_BPPC3_LearnMem = second_release_family_bppca$Neurocog_BPPC3_LearnMem)
-
-write_csv(second_release_family,
-          "/Users/wesleymeredith/Documents/github_repos/shared_abcd_enviro/abcd_enviro/enviro_output/abcd_enviro_secondrelfamily.csv")
-
-```
 
 ## Regress out age and sex from PC participant loadings
 ```{r}
@@ -745,98 +750,6 @@ second_release_resid <- second_release_data %>%
 
 write.csv(second_release_resid, 'ABCD_release2_PCresid.csv', row.names = FALSE)
 
-## full sample single family member subset
-X <- as.matrix(full_sample_family[c("Age",
-                                "Male")])
-
-Y <- as.matrix(full_sample_family[c("culture_PC1", "home_PC1", "school_PC1", "neighborhood_PC1", "sociodemo_PC1","neurocog_PC1", "neurocog_PC2",
-                                    "neurocog_PC3", "Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc", "Neurocog_BPPC3_LearnMem")])
-
-lm.ControlDem <- lm(Y ~ X, data = full_sample_family)
-CombMeasures_allcog_resid <- lm.ControlDem$residuals
-
-
-full_sample_family <- full_sample_family %>%
-  mutate(culture_PC1_resid = CombMeasures_allcog_resid[,"culture_PC1"],
-         home_PC1_resid = CombMeasures_allcog_resid[,"home_PC1"],
-         school_PC1_resid = CombMeasures_allcog_resid[,"school_PC1"],
-         neighborhood_PC1_resid = CombMeasures_allcog_resid[,"neighborhood_PC1"],
-         sociodemo_PC1_resid = CombMeasures_allcog_resid[,"sociodemo_PC1"],
-         neurocog_PC1_resid = CombMeasures_allcog_resid[,"neurocog_PC1"],
-         neurocog_PC2_resid = CombMeasures_allcog_resid[,"neurocog_PC2"],
-         neurocog_PC3_resid = CombMeasures_allcog_resid[,"neurocog_PC3"],
-         Neurocog_BPPC1_GenAbility_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC1_GenAbility"],
-         Neurocog_BPPC2_ExecFunc_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC2_ExecFunc"],
-         Neurocog_BPPC3_LearnMem_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC3_LearnMem"])
-
-full_sample_family_resid <- full_sample_family %>%
-  dplyr::select(subject_id, abcd_site, culture_PC1_resid, home_PC1_resid, school_PC1_resid, neighborhood_PC1_resid, 
-                sociodemo_PC1_resid, Neurocog_BPPC1_GenAbility_resid, Neurocog_BPPC2_ExecFunc_resid, Neurocog_BPPC3_LearnMem_resid)
-
-write.csv(full_sample_family_resid, 'ABCD_fullfamily_PCresid.csv', row.names = FALSE)
-
-## first release single family member subset
-X <- as.matrix(first_release_family[c("Age",
-                                "Male")])
-
-Y <- as.matrix(first_release_family[c("culture_PC1", "home_PC1", "school_PC1", "neighborhood_PC1", "sociodemo_PC1","neurocog_PC1", "neurocog_PC2",
-                                    "neurocog_PC3", "Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc", "Neurocog_BPPC3_LearnMem")])
-
-lm.ControlDem <- lm(Y ~ X, data = first_release_family)
-CombMeasures_allcog_resid <- lm.ControlDem$residuals
-
-
-first_release_family <- first_release_family %>%
-  mutate(culture_PC1_resid = CombMeasures_allcog_resid[,"culture_PC1"],
-         home_PC1_resid = CombMeasures_allcog_resid[,"home_PC1"],
-         school_PC1_resid = CombMeasures_allcog_resid[,"school_PC1"],
-         neighborhood_PC1_resid = CombMeasures_allcog_resid[,"neighborhood_PC1"],
-         sociodemo_PC1_resid = CombMeasures_allcog_resid[,"sociodemo_PC1"],
-         neurocog_PC1_resid = CombMeasures_allcog_resid[,"neurocog_PC1"],
-         neurocog_PC2_resid = CombMeasures_allcog_resid[,"neurocog_PC2"],
-         neurocog_PC3_resid = CombMeasures_allcog_resid[,"neurocog_PC3"],
-         Neurocog_BPPC1_GenAbility_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC1_GenAbility"],
-         Neurocog_BPPC2_ExecFunc_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC2_ExecFunc"],
-         Neurocog_BPPC3_LearnMem_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC3_LearnMem"])
-
-first_release_family_resid <- first_release_family %>%
-  dplyr::select(subject_id, abcd_site, culture_PC1_resid, home_PC1_resid, school_PC1_resid, neighborhood_PC1_resid, 
-                sociodemo_PC1_resid, Neurocog_BPPC1_GenAbility_resid, Neurocog_BPPC2_ExecFunc_resid, Neurocog_BPPC3_LearnMem_resid)
-
-write.csv(first_release_family_resid, 'ABCD_rel1family_PCresid.csv', row.names = FALSE)
-
-## second release single family member subset
-X <- as.matrix(second_release_family[c("Age",
-                                "Male")])
-
-Y <- as.matrix(second_release_family[c("culture_PC1", "home_PC1", "school_PC1", "neighborhood_PC1", "sociodemo_PC1","neurocog_PC1", "neurocog_PC2",
-                                    "neurocog_PC3", "Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc", "Neurocog_BPPC3_LearnMem")])
-
-
-lm.ControlDem <- lm(Y ~ X, data = second_release_family)
-CombMeasures_allcog_resid <- lm.ControlDem$residuals
-
-
-second_release_family <- second_release_family %>%
-  mutate(culture_PC1_resid = CombMeasures_allcog_resid[,"culture_PC1"],
-         home_PC1_resid = CombMeasures_allcog_resid[,"home_PC1"],
-         school_PC1_resid = CombMeasures_allcog_resid[,"school_PC1"],
-         neighborhood_PC1_resid = CombMeasures_allcog_resid[,"neighborhood_PC1"],
-         sociodemo_PC1_resid = CombMeasures_allcog_resid[,"sociodemo_PC1"],
-         neurocog_PC1_resid = CombMeasures_allcog_resid[,"neurocog_PC1"],
-         neurocog_PC2_resid = CombMeasures_allcog_resid[,"neurocog_PC2"],
-         neurocog_PC3_resid = CombMeasures_allcog_resid[,"neurocog_PC3"],
-         Neurocog_BPPC1_GenAbility_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC1_GenAbility"],
-         Neurocog_BPPC2_ExecFunc_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC2_ExecFunc"],
-         Neurocog_BPPC3_LearnMem_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC3_LearnMem"])
-
-second_release_family_resid <- second_release_family %>%
-  dplyr::select(subject_id, abcd_site, culture_PC1_resid, home_PC1_resid, school_PC1_resid, neighborhood_PC1_resid, 
-                sociodemo_PC1_resid, Neurocog_BPPC1_GenAbility_resid, Neurocog_BPPC2_ExecFunc_resid, Neurocog_BPPC3_LearnMem_resid)
-
-write.csv(second_release_family_resid, 'ABCD_rel2family_PCresid.csv', row.names = FALSE)
-
-
 ```
 
 ## Regress out age and sex from enviro/sociodem vars and compare participant loadings with the regressed loadings above
@@ -900,33 +813,36 @@ rel2_sociodemovarres_pca    <- PCA(CombMeasures_allcog_resid[,SociodemoVar_list$
 ## Plot variable contributions for environment and sociodemographic categories
 ```{r}
 # set colors for figs and plot theme
-color_teal <- "#77AAAD"
-color_grey <- "#6E7783"
-color_red <-  "#D7191C"
-color_orange <- "#d2a273"
-color_blue <- "#2B83BA"
-color_green <- "#729c6c"
+color_sociodem <- "#EBF094"
+color_home <- "#B1D8B7"
+color_school <-  "#7CC644"
+color_culture <- "#116530"
+color_neighborhood <- "#16A637"
+color_genabil <- "#CB6CE6"
+color_execfunc <- "#FF66C4"
+color_learnmem <- "#8C52FF"
+color_cog <- "#77AAAD"
 
 pc_theme <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
                                        panel.grid.minor = element_blank(), 
                                        axis.title.x = element_blank(), 
                                        axis.title.y = element_blank(),
                                       axis.text.x = element_text(size = 14),
-                                       axis.text.y = element_text(size = 12))
+                                       axis.text.y = element_blank())
 
 pc_theme_toptitles <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
                                        panel.grid.minor = element_blank(), 
                                        axis.title.x = element_blank(), 
                                        axis.title.y = element_blank(),
                                        axis.text.x = element_text(size = 14),
-                                       axis.text.y = element_text(size = 12))
+                                       axis.text.y = element_blank())
 
 pc_theme2 <- theme_minimal() + theme(legend.position="none", panel.grid.major = element_blank(), 
                                        panel.grid.minor = element_blank(), 
                                        axis.title.x = element_text(size = 14), 
                                        axis.title.y = element_blank(),
                                        axis.text.x = element_text(size = 14),
-                                       axis.text.y = element_text(size = 12))
+                                       axis.text.y = element_blank())
 
 # Culture 
 ## rel 1.1 
@@ -941,16 +857,18 @@ rel1_culture_pccontrib$Contribution[rel1_negative_dir_culture] <- -1 * rel1_cult
 
 (rel1_culture_pccontrib_plot <- rel1_culture_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_red) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_culture) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
                 pc_theme )
 
 ggsave("rel1_culture_pccontrib_plot.png")
 
+
 ## rel 2.0.1 
 rel2_culture_pccontrib <- data.table(Contribution = rel2_culture_pca$var$contrib[,1]) %>%
-        mutate(Variable = rownames(rel2_culture_pca$var$contrib))
+        mutate(Variable = rownames(rel2_culture_pca$var$contrib),
+               rel1_order = rel1_culture_pccontrib$Contribution)
 
 rel2_culture_pcdirect <- data.table(Coord =  rel2_culture_pca$var$coord[,1]) %>%
         mutate(Variable = rownames(rel2_culture_pca$var$coord))
@@ -959,11 +877,11 @@ rel2_negative_dir_culture <- which(rel2_culture_pcdirect$Coord < 0)
 rel2_culture_pccontrib$Contribution[rel2_negative_dir_culture] <- -1 * rel2_culture_pccontrib$Contribution[rel2_negative_dir_culture]
 
 (rel2_culture_pccontrib_plot <- rel2_culture_pccontrib %>%
-                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_red) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                ggplot(aes(x = reorder(Variable, rel1_order), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_culture) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
-                pc_theme )
+                pc_theme)
 
 ggsave("rel2_culture_pccontrib_plot.png")
 
@@ -980,17 +898,17 @@ rel1_home_pccontrib$Contribution[rel1_negative_dir_home] <- -1 * rel1_home_pccon
 
 (rel1_home_pccontrib_plot <- rel1_home_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_orange) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_home) +
     scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
-                ggtitle("Release 1.1 PCA Loadings") +
-                pc_theme_toptitles )
+    pc_theme)
 
 ggsave("rel1_home_pccontrib_plot.png")
 
 ## rel 2.0.1
 rel2_home_pccontrib <- data.table(Contribution = rel2_home_pca$var$contrib[,1]) %>%
-        mutate(Variable = rownames(rel2_home_pca$var$contrib))
+        mutate(Variable = rownames(rel2_home_pca$var$contrib),
+               rel1_order = rel1_home_pccontrib$Contribution)
 
 rel2_home_pcdirect <- data.table(Coord = rel2_home_pca$var$coord[,1]) %>%
         mutate(Variable = rownames(rel2_home_pca$var$coord))
@@ -999,12 +917,11 @@ rel2_negative_dir_home <- which(rel2_home_pcdirect$Coord < 0)
 rel2_home_pccontrib$Contribution[rel2_negative_dir_home] <- -1 * rel2_home_pccontrib$Contribution[rel2_negative_dir_home]
 
 (rel2_home_pccontrib_plot <- rel2_home_pccontrib %>%
-                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_orange) +
-    scale_y_continuous(limits = c(-35, 40)) +
+                ggplot(aes(x = reorder(Variable, rel1_order), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_home) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
-                ggtitle("Release 2.0.1 PCA Loadings") +
-                pc_theme_toptitles )
+                pc_theme)
 
 ggsave("rel2_home_pccontrib_plot.png")
 
@@ -1021,8 +938,8 @@ rel1_school_pccontrib$Contribution[rel1_negative_dir_school] <- -1 * rel1_school
 
 (rel1_school_pccontrib_plot <- rel1_school_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_blue) +
-    #scale_y_continuous(limits = c(-30, 45)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_school) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1030,7 +947,8 @@ ggsave("rel1_school_pccontrib_plot.png")
 
 ## rel 2.0.1 
 rel2_school_pccontrib <- data.table(Contribution = rel2_school_pca$var$contrib[,1]) %>%
-        mutate(Variable = rownames(rel2_school_pca$var$contrib))
+        mutate(Variable = rownames(rel2_school_pca$var$contrib),
+               rel1_order = rel1_school_pccontrib$Contribution)
 
 rel2_school_pcdirect <- data.table(Coord = rel2_school_pca$var$coord[,1]) %>%
         mutate(Variable = rownames(rel2_school_pca$var$coord))
@@ -1039,9 +957,9 @@ rel2_negative_dir_school <- which(rel2_school_pcdirect$Coord < 0)
 rel2_school_pccontrib$Contribution[rel2_negative_dir_school] <- -1 * rel2_school_pccontrib$Contribution[rel2_negative_dir_school]
 
 (rel2_school_pccontrib_plot <- rel2_school_pccontrib %>%
-                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_blue) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                ggplot(aes(x = reorder(Variable, rel1_order), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_school) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1060,8 +978,8 @@ rel1_neighborhood_pccontrib$Contribution[rel1_negative_dir_neighborhood] <- -1 *
 
 (rel1_neighborhood_pccontrib_plot <- rel1_neighborhood_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_green) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_neighborhood) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1069,7 +987,8 @@ ggsave("rel1_neighborhood_pccontrib_plot.png")
 
 ## rel 2.0.1
 rel2_neighborhood_pccontrib <- data.table(Contribution = rel2_neighborhood_pca$var$contrib[,1])%>%
-        mutate(Variable = rownames(rel2_neighborhood_pca$var$contrib))
+        mutate(Variable = rownames(rel2_neighborhood_pca$var$contrib),
+               rel1_order = rel1_neighborhood_pccontrib$Contribution)
 
 rel2_neighborhood_pcdirect <- data.table(Coord =  rel2_neighborhood_pca$var$coord[,1]) %>%
         mutate(Variable = rownames(rel2_neighborhood_pca$var$coord))
@@ -1078,11 +997,11 @@ rel2_negative_dir_neighborhood <- which(rel2_neighborhood_pcdirect$Coord < 0)
 rel2_neighborhood_pccontrib$Contribution[rel2_negative_dir_neighborhood] <- -1 * rel2_neighborhood_pccontrib$Contribution[rel2_negative_dir_neighborhood]
 
 (rel2_neighborhood_pccontrib_plot <- rel2_neighborhood_pccontrib %>%
-                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_green) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                ggplot(aes(x = reorder(Variable, rel1_order), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_neighborhood) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
-                pc_theme )
+                pc_theme)
 
 ggsave("rel2_neighborhood_pccontrib_plot.png")
 
@@ -1099,16 +1018,17 @@ rel1_sociodemo_pccontrib$Contribution[rel1_negative_dir_sociodemo] <- -1 * rel1_
 
 (rel1_sociodemo_pccontrib_plot <- rel1_sociodemo_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_grey) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_sociodem) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
-                pc_theme2 )
+                pc_theme)
 
 ggsave("rel1_sociodemo_pccontrib_plot.png")
 
 ## rel 2.0.1
 rel2_sociodemo_pccontrib <- data.table(Contribution = rel2_sociodemo_pca$var$contrib[,1]) %>%
-        mutate(Variable = rownames(rel2_sociodemo_pca$var$contrib))
+        mutate(Variable = rownames(rel2_sociodemo_pca$var$contrib),
+               rel1_order = rel1_sociodemo_pccontrib$Contribution)
 
 rel2_sociodemo_pcdirect <- data.table(Coord = rel2_sociodemo_pca$var$coord[,1]) %>%
         mutate(Variable = rownames(rel2_sociodemo_pca$var$coord))
@@ -1117,11 +1037,11 @@ rel2_negative_dir_sociodemo <- which(rel2_sociodemo_pcdirect$Coord < 0)
 rel2_sociodemo_pccontrib$Contribution[rel2_negative_dir_sociodemo] <- -1 * rel2_sociodemo_pccontrib$Contribution[rel2_negative_dir_sociodemo]
 
 (rel2_sociodemo_pccontrib_plot <- rel2_sociodemo_pccontrib %>%
-                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_grey) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                ggplot(aes(x = reorder(Variable, rel1_order), y = Contribution)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_sociodem) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
-                pc_theme2 )
+                pc_theme )
 
 ggsave("rel2_sociodemo_pccontrib_plot.png")
 
@@ -1138,8 +1058,8 @@ rel1_neurocog1_pccontrib$Contribution[rel1_negative_dir_neurocog1] <- -1 * rel1_
 
 (rel1_neurocog1_pccontrib_plot <- rel1_neurocog1_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1157,8 +1077,8 @@ rel2_neurocog1_pccontrib$Contribution[rel2_negative_dir_neurocog1] <- -1 * rel2_
 
 (rel2_neurocog1_pccontrib_plot <- rel2_neurocog1_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1177,8 +1097,8 @@ rel1_neurocog2_pccontrib$Contribution[rel1_negative_dir_neurocog2] <- -1 * rel1_
 
 (rel1_neurocog2_pccontrib_plot <- rel1_neurocog2_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1196,8 +1116,8 @@ rel2_neurocog2_pccontrib$Contribution[rel2_negative_dir_neurocog2] <- -1 * rel2_
 
 (rel2_neurocog2_pccontrib_plot <- rel2_neurocog2_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1216,8 +1136,8 @@ rel1_neurocog3_pccontrib$Contribution[rel1_negative_dir_neurocog3] <- -1 * rel1_
 
 (rel1_neurocog3_pccontrib_plot <- rel1_neurocog3_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
-    scale_y_continuous(limits = c(-30, 45)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1235,8 +1155,8 @@ rel2_neurocog3_pccontrib$Contribution[rel2_negative_dir_neurocog3] <- -1 * rel2_
 
 (rel2_neurocog3_pccontrib_plot <- rel2_neurocog3_pccontrib %>%
                 ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_teal) +
-    scale_y_continuous(limits = c(-30, 50)) +
+                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
+    scale_y_continuous(limits = c(-35, 45)) +
                 coord_flip() +
                 pc_theme )
 
@@ -1247,105 +1167,22 @@ ggsave("rel2_neurocog3_pccontrib_plot.png")
 ## Combine plots for Release 1 and 2 PCs
 ```{r}
 
-(relplot_pcfig <- grid.arrange(rel1_home_pccontrib_plot,
+(relplot_pcfig <- grid.arrange(rel1_sociodemo_pccontrib_plot,
+                               rel2_sociodemo_pccontrib_plot,
+                               rel1_home_pccontrib_plot,
                                      rel2_home_pccontrib_plot,
                                      rel1_school_pccontrib_plot,
                                      rel2_school_pccontrib_plot,
                                      rel1_neighborhood_pccontrib_plot,
                                rel2_neighborhood_pccontrib_plot,
                                      rel1_culture_pccontrib_plot,
-                               rel2_culture_pccontrib_plot, 
-                               rel1_sociodemo_pccontrib_plot,
-                               rel2_sociodemo_pccontrib_plot,
-                                     heights = c(1, 1, 3, 1, 1),
+                               rel2_culture_pccontrib_plot,
+                                     heights = c(1, 1, 1, 3, 1),
                                      nrow = 5))
-ggsave('relplot_pcfig2.png', relplot_pcfig, height = 17, width = 14)
-
-a <- list(1, 22, 3, 4 )
-b <- c("a", "b", "c")
-c <- 6
-
-datalist <- list(a, b, c)
-saveRDS(datalist, "test_datalist.RDS")
-
-save(list = c("a", "b", "c"), file = "test_rdata_datalist.RData")
+ggsave('relplot_pcfig3.png', relplot_pcfig, height = 17, width = 14)
 
 ```
 
-## update PC loading figures for mediation model fig 
-```{r}
-
-(homepc_icon <- rel2_home_pccontrib_plot +
-  theme(legend.position="none", 
-            panel.grid.major = element_blank(), 
-            panel.grid.minor = element_blank(), 
-            axis.title = element_blank(), 
-            axis.text = element_blank()) +
-   ggtitle(""))
-
-(schoolpc_icon <- rel2_school_pccontrib_plot +
-    theme(legend.position="none", 
-            panel.grid.major = element_blank(), 
-            panel.grid.minor = element_blank(), 
-            axis.title = element_blank(), 
-            axis.text = element_blank()))
-
-(neighborhoodpc_icon <- rel2_neighborhood_pccontrib_plot +
-    scale_y_continuous(limits = c(-10, 10)) +
-  theme(legend.position="none", 
-            panel.grid.major = element_blank(), 
-            panel.grid.minor = element_blank(), 
-            axis.title = element_blank(), 
-            axis.text = element_blank()))
-
-(culturepc_icon <- rel2_culture_pccontrib_plot +
-    scale_y_continuous(limits = c(-20, 25)) +
-  theme(legend.position="none", 
-            panel.grid.major = element_blank(), 
-            panel.grid.minor = element_blank(), 
-            axis.title = element_blank(), 
-            axis.text = element_blank()))
-                               
-(sociodemopc_icon <- rel2_sociodemo_pccontrib_plot +
-     scale_y_continuous(limits = c(-30, 30)) +
-  theme(legend.position="none", 
-            panel.grid.major = element_blank(), 
-            panel.grid.minor = element_blank(), 
-            axis.title = element_blank(), 
-            axis.text = element_blank()))
-
-(neurocogpc1_icon <- rel2_neurocog1_pccontrib_plot +
-     scale_y_continuous(limits = c(-15, 15)) +
-    theme(legend.position="none", 
-            panel.grid.major = element_blank(), 
-            panel.grid.minor = element_blank(), 
-            axis.title = element_blank(), 
-            axis.text = element_blank()))
-
-(neurocogpc2_icon <- rel2_neurocog2_pccontrib_plot +
-     scale_y_continuous(limits = c(-20, 35)) +
-    theme(legend.position="none", 
-            panel.grid.major = element_blank(), 
-            panel.grid.minor = element_blank(), 
-            axis.title = element_blank(), 
-            axis.text = element_blank()))
-
-(neurocogpc3_icon <- rel2_neurocog3_pccontrib_plot +
-    theme(legend.position="none", 
-            panel.grid.major = element_blank(), 
-            panel.grid.minor = element_blank(), 
-            axis.title = element_blank(), 
-            axis.text = element_blank()))
-
-(enviropc_iconfig <- grid.arrange(homepc_icon, schoolpc_icon, neighborhoodpc_icon, culturepc_icon,  nrow = 1))
-ggsave('enviropc_iconfig.png', enviropc_iconfig, height = 3, width = 5)
-
-(neuroogpc_iconfig <- grid.arrange(neurocogpc1_icon, neurocogpc2_icon, neurocogpc3_icon, nrow = 1))
-ggsave('neuroogpc_iconfig.png', neuroogpc_iconfig, height = 3, width = 4)
-
-ggsave('sociodemopc_iconfig.png', sociodemopc_icon, height = 3, width = 2)
-
-```
 
 ## Compare PC loadings with and without regressed covariates 
 ```{r}
@@ -1407,20 +1244,89 @@ ggsave('sociodemopc_iconfig.png', sociodemopc_icon, height = 3, width = 2)
 ```
 
 
+
 ## Compare variable loadings across site splits
 
 ```{r}
+rel1pc_corr_pvals <- cor.mtest(first_release_data[, c(81, 78:80, 77, 85:87)], method = "spearman")
+(cor.test(full_sample_data$neurocog_PC1, full_sample_data$Neurocog_BPPC1_GenAbility, method = "spearman"))
+
 # culture 
-(rel_culture_corr <- cor.test(rel1_culture_pccontrib$Contribution, rel2_culture_pccontrib$Contribution, method = "pearson"))
+site_culture_corr <- diag(cor(site1_culture_varload, site2_culture_varload, method = "pearson"))
+
+#site_culture_corr_pval <- cor.mtest(site1_culture_varload, site2_culture_varload, method = "pearson")
 
 # home 
-(rel_home_corr <- cor.test(rel1_home_pccontrib$Contribution, rel2_home_pccontrib$Contribution, method = "pearson"))
+site_home_corr <- cor(site1_home_varload, site2_home_varload, method = "pearson")
+
+#site_home_corr_pval <- cor.mtest(site1_home_varload, site2_home_varload, method = "pearson")
 
 #school
-(rel_school_corr <- cor.test(rel1_school_pccontrib$Contribution, rel2_school_pccontrib$Contribution, method = "pearson"))
+site1_school_corr <- cor(site1_school_varload, method = "pearson")
+site2_school_corr <- cor(site2_school_varload, method = "pearson")
+
+site1_school_corr_pval <- cor.mtest(site1_school_varload, method = "pearson")
+site2_school_corr_pval <- cor.mtest(site2_school_varload, method = "pearson")
 
 #neighborhood
-(rel_neighborhood_corr <- cor.test(rel1_neighborhood_pccontrib$Contribution, rel2_neighborhood_pccontrib$Contribution, method = "pearson"))
+site1_neighborhood_corr <- cor(site1_neighborhood_varload, method = "pearson")
+site2_neighborhood_corr <- cor(site2_neighborhood_varload, method = "pearson")
+
+site1_neighborhood_corr_pval <- cor.mtest(site1_neighborhood_varload, method = "pearson")
+site2_neighborhood_corr_pval <- cor.mtest(site2_neighborhood_varload, method = "pearson")
+
+#sociodemo
+site1_sociodemo_corr <- cor(site1_sociodemo_varload, method = "pearson")
+site2_sociodemo_corr <- cor(site2_sociodemo_varload, method = "pearson")
+
+site1_sociodemo_corr_pval <- cor.mtest(site1_sociodemo_varload, method = "pearson")
+site2_sociodemo_corr_pval <- cor.mtest(site2_sociodemo_varload, method = "pearson")
+
+##### average correlation coef for site split variable loadings #####
+#culture
+site1_culture_corr_avg <- mean(site1_culture_corr[lower.tri(site1_culture_corr)])
+c(site1_culture_corr_avg, max(site1_culture_corr_pval$p[lower.tri(site1_culture_corr_pval$p)]), 
+  min(site1_culture_corr_pval$p[lower.tri(site1_culture_corr_pval$p)]))
+
+site2_culture_corr_avg <- mean(site2_culture_corr[lower.tri(site2_culture_corr)])
+c(site2_culture_corr_avg, max(site2_culture_corr_pval$p[lower.tri(site2_culture_corr_pval$p)]), 
+  min(site2_culture_corr_pval$p[lower.tri(site2_culture_corr_pval$p)]))
+
+#home
+site1_home_corr_avg <- mean(site1_home_corr[lower.tri(site1_home_corr)])
+c(site1_home_corr_avg, max(site1_home_corr_pval$p[lower.tri(site1_home_corr_pval$p)]), 
+  min(site1_home_corr_pval$p[lower.tri(site1_home_corr_pval$p)]))
+
+site2_home_corr_avg <- mean(site2_home_corr[lower.tri(site2_home_corr)])
+c(site2_home_corr_avg, max(site2_home_corr_pval$p[lower.tri(site2_home_corr_pval$p)]), 
+  min(site2_home_corr_pval$p[lower.tri(site2_home_corr_pval$p)]))
+
+#school
+site1_school_corr_avg <- mean(site1_school_corr[lower.tri(site1_school_corr)])
+c(site1_school_corr_avg, max(site1_school_corr_pval$p[lower.tri(site1_school_corr_pval$p)]), 
+  min(site1_school_corr_pval$p[lower.tri(site1_school_corr_pval$p)]))
+
+site2_school_corr_avg <- mean(site2_school_corr[lower.tri(site2_school_corr)])
+c(site2_school_corr_avg, max(site2_school_corr_pval$p[lower.tri(site2_school_corr_pval$p)]), 
+  min(site2_school_corr_pval$p[lower.tri(site2_school_corr_pval$p)]))
+
+#neighborhood
+site1_neighborhood_corr_avg <- mean(site1_neighborhood_corr[lower.tri(site1_neighborhood_corr)])
+c(site1_neighborhood_corr_avg, max(site1_neighborhood_corr_pval$p[lower.tri(site1_neighborhood_corr_pval$p)]), 
+  min(site1_neighborhood_corr_pval$p[lower.tri(site1_neighborhood_corr_pval$p)]))
+
+site2_neighborhood_corr_avg <- mean(site2_neighborhood_corr[lower.tri(site2_neighborhood_corr)])
+c(site2_neighborhood_corr_avg, max(site2_neighborhood_corr_pval$p[lower.tri(site2_neighborhood_corr_pval$p)]), 
+  min(site2_neighborhood_corr_pval$p[lower.tri(site2_neighborhood_corr_pval$p)]))
+
+#sociodemo
+site1_sociodemo_corr_avg <- mean(site1_sociodemo_corr[lower.tri(site1_sociodemo_corr)])
+c(site1_sociodemo_corr_avg, max(site1_sociodemo_corr_pval$p[lower.tri(site1_sociodemo_corr_pval$p)]), 
+  min(site1_sociodemo_corr_pval$p[lower.tri(site1_sociodemo_corr_pval$p)]))
+
+site2_sociodemo_corr_avg <- mean(site2_sociodemo_corr[lower.tri(site2_sociodemo_corr)])
+c(site2_sociodemo_corr_avg, max(site2_sociodemo_corr_pval$p[lower.tri(site2_sociodemo_corr_pval$p)]), 
+  min(site2_sociodemo_corr_pval$p[lower.tri(site2_sociodemo_corr_pval$p)]))
 
 
 ```
@@ -1451,37 +1357,165 @@ relcom_corr_pvals[lower.tri(relcom_corr_pvals)] <- rel1var_corr_pvals$p[lower.tr
 relcom_corr_pvals[upper.tri(relcom_corr_pvals)] <- rel2var_corr_pvals$p[upper.tri(rel2var_corr_pvals$p)]
 diag(relcom_corr_pvals) <- 0
 
-rownames(relcomb_corr) <- c("White", "Black", "Hispanic", "Asian", "Other Race", "Household Income", "Caregiver Education", "Family Conflict (Parent)",
-                            "Parent Monitoring", "Family Conflict (Youth)", "Parent Acceptance", "School Environment", "School Involvement", "School Disengagement",
-                            "Neighborhood Safety (Parent)", "Neighborhood Safety (Youth)", "Walkability", "NO2 Exposure", "PM25 Exposure","Proximity to Roads (log)",
-                            "Residential Density (log)", "Violent Crime Rate (log)", "Drug Abuse Rate (log)", "Drug Sales Rate (log)", "Drug Possession Rate (log)",
-                            "DUI Rate (log)", "Marijuana Sales Rate (log)", "Education < HS", "Education - HS Diploma", "Occupation- White Collar",
-                            "Median Family Income",  "Income Disparity Index", "Median Home Value", "Median Gross Rent", "Median Monthly Mortgage",  
-                            "Home Ownership (%)","Unemployed (%)","Families in Poverty (%)", "Below Povery Line (%)","Single/Not Married (%)",
-                            "Car Ownership (%, log)", "Telephone in Home (%, log)", "Plumbing in Home (%, log)", "Overcrowding (%)", 
-                            "Ethnic Identity Exploration", "Ethnic Identity Commitment", "Family Obligation", "Family as Referent", "Family Support",
-                            "Indepence/SelfReliance", "Religion", "Cog - General Ability", "Cog - Executive Function", "Cog - Learning/Memory")
+# rownames(relcomb_corr) <- c("White", "Black", "Hispanic", "Asian", "Other Race", "Household Income", "Caregiver Education", "Family Conflict (Parent)",
+#                             "Parent Monitoring", "Family Conflict (Youth)", "Parent Acceptance", "School Environment", "School Involvement", "School Disengagement",
+#                             "Neighborhood Safety (Parent)", "Neighborhood Safety (Youth)", "Walkability", "NO2 Exposure", "PM25 Exposure","Proximity to Roads (log)",
+#                             "Residential Density (log)", "Violent Crime Rate (log)", "Drug Abuse Rate (log)", "Drug Sales Rate (log)", "Drug Possession Rate (log)",
+#                             "DUI Rate (log)", "Marijuana Sales Rate (log)", "Education < HS", "Education - HS Diploma", "Occupation- White Collar",
+#                             "Median Family Income",  "Income Disparity Index", "Median Home Value", "Median Gross Rent", "Median Monthly Mortgage",
+#                             "Home Ownership (%)","Unemployed (%)","Families in Poverty (%)", "Below Povery Line (%)","Single/Not Married (%)",
+#                             "Car Ownership (%, log)", "Telephone in Home (%, log)", "Plumbing in Home (%, log)", "Overcrowding (%)",
+#                             "Ethnic Identity Exploration", "Ethnic Identity Commitment", "Family Obligation", "Family as Referent", "Family Support",
+#                             "Indepence/SelfReliance", "Religion", "Cog - General Ability", "Cog - Executive Function", "Cog - Learning/Memory")
 
+rownames(relcomb_corr) <- c(rep("",54))
 colnames(relcomb_corr) <- c(rep(" ", 54))
 
 png("relcom_corrplot.png", res = 700, width = 16000, height = 12000)
 (variable_corrplot <- corrplot(relcomb_corr, method = 'color', col = corr_color2(100), type = "full", diag = FALSE, cl.pos = "r", cl.cex = 1.8, tl.cex = 1.8, tl.col = "black", tl.srt = 0))
-corrRect(c(7, 4, 3, 30, 7, 3), col = c(color_grey, color_orange, color_blue, color_green, color_red, color_teal), lwd = 6)
-dev.off()
-
-## full sample corr plot 
-fullvar_corr <- cor(full_sample_data[, c(3:55, 65:67)])
-fullvar_corr_pvals <- cor.mtest(full_sample_data[,c(3:55, 65:67)], method = "spearman")
-
-png("fullvar_corrplot.png", res = 600, width = 14000, height = 14000)
-(variable_corrplot <- corrplot(fullvar_corr, method = 'color', type = "full", diag = FALSE, p.mat =fullvar_corr_pvals$p, col = corr_color,
-                              insig = "label_sig", cl.pos = "b", cl.cex = 2.5, pch.col = "black", pch.cex = 2.25, tl.cex = 2.15, tl.srt = 20, tl.col = "black"))
+#corrRect(c(7, 4, 3, 30, 7, 3), lwd = 6)
 dev.off()
 
 ```
 
+## Project release 1 and release 2 participants through other PC
+```{r}
+##### project release 1.1 participants through release 2.0.1 PCs #####
+### home  ###
+rel1_projrel2_home <- predict.PCA(rel2_home_pca, first_release_data[HomeEnvVar_list$V1])
+
+### school ###
+rel1_projrel2_school <- predict.PCA(rel2_school_pca, first_release_data[SchoolEnvVar_list$V1])
+
+### neigborhood ###
+rel1_projrel2_neighborhood <- predict.PCA(rel2_neighborhood_pca, first_release_data[NeighborhoodEnvVar_list$V1])
+
+### culture ###
+rel1_projrel2_culture <- predict.PCA(rel2_culture_pca, first_release_data[CultureEnvVar_list$V1])
+
+### sociodemo ###
+rel1_projrel2_sociodemo <- predict.PCA(rel2_sociodemo_pca, first_release_data[SociodemoVar_list$V1])
+
+
+##### project release 2.0.1 participants throgh release 1.1 PCs #####
+### home  ###
+rel2_projrel1_home <- predict.PCA(rel1_home_pca, second_release_data[HomeEnvVar_list$V1])
+
+### school ###
+rel2_projrel1_school <- predict.PCA(rel1_school_pca, second_release_data[SchoolEnvVar_list$V1])
+
+### neigborhood ###
+rel2_projrel1_neighborhood <- predict.PCA(rel1_neighborhood_pca, second_release_data[NeighborhoodEnvVar_list$V1])
+
+### culture ###
+rel2_projrel1_culture <- predict.PCA(rel1_culture_pca, second_release_data[CultureEnvVar_list$V1])
+
+### sociodemo ###
+rel2_projrel1_sociodemo <- predict.PCA(rel1_sociodemo_pca, second_release_data[SociodemoVar_list$V1])
+
+##### combine projected and original participant weights #####
+
+rel1_projrel2_PC <- data.table(home_PC1 = rel1_projrel2_home$coord[,1],
+                            school_PC1 = rel1_projrel2_school$coord[,1],
+                            neighborhood_PC1 = -1 * rel1_projrel2_neighborhood$coord[,1],
+                            culture_PC1 = -1 * rel1_projrel2_culture$coord[,1],
+                            sociodemo_PC1 = rel1_projrel2_sociodemo$coord[,1],
+                            Neurocog_BPPC1_GenAbility = first_release_bppca$Neurocog_BPPC1_GenAbility,
+                            Neurocog_BPPC2_ExecFunc = first_release_bppca$Neurocog_BPPC2_ExecFunc,
+                            Neurocog_BPPC3_LearnMem = first_release_bppca$Neurocog_BPPC3_LearnMem,
+                            Age = first_release_data$Age,
+                            Male = first_release_data$Male)
+
+rel2_projrel1_PC <- data.table(home_PC1 = rel2_projrel1_home$coord[,1],
+                            school_PC1 = rel2_projrel1_school$coord[,1],
+                            neighborhood_PC1 = -1 * rel2_projrel1_neighborhood$coord[,1],
+                            culture_PC1 = -1 * rel2_projrel1_culture$coord[,1],
+                            sociodemo_PC1 = rel2_projrel1_sociodemo$coord[,1],
+                            Neurocog_BPPC1_GenAbility = second_release_bppca$Neurocog_BPPC1_GenAbility,
+                            Neurocog_BPPC2_ExecFunc = second_release_bppca$Neurocog_BPPC2_ExecFunc, 
+                            Neurocog_BPPC3_LearnMem = second_release_bppca$Neurocog_BPPC3_LearnMem,
+                            Age = second_release_data$Age,
+                            Male = second_release_data$Male)
+
+rel1_PC <- first_release_data %>%
+  dplyr::select(sociodemo_PC1_resid,
+                home_PC1_resid,
+                school_PC1_resid,
+                neighborhood_PC1_resid,
+                culture_PC1_resid,
+                Neurocog_BPPC1_GenAbility_resid,
+                Neurocog_BPPC2_ExecFunc_resid,
+                Neurocog_BPPC3_LearnMem_resid)
+
+rel2_PC <- second_release_data %>%
+  dplyr::select(sociodemo_PC1_resid,
+                home_PC1_resid,
+                school_PC1_resid,
+                neighborhood_PC1_resid,
+                culture_PC1_resid,
+                Neurocog_BPPC1_GenAbility_resid,
+                Neurocog_BPPC2_ExecFunc_resid,
+                Neurocog_BPPC3_LearnMem_resid)
+
+
+##### Regress out age and sex #####
+
+#Combined Release 1 PCs
+X <- as.matrix(rel1_projrel2_PC[, c("Age", "Male")])
+
+Y <- as.matrix(rel1_projrel2_PC[, c("culture_PC1", "home_PC1", "school_PC1", "neighborhood_PC1", "sociodemo_PC1",
+                                     "Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc", "Neurocog_BPPC3_LearnMem")])
+
+
+lm.ControlDem <- lm(Y ~ X, data = rel1_projrel2_PC)
+CombMeasures_allcog_resid <- lm.ControlDem$residuals
+
+
+rel1_projrel2_PC <- rel1_projrel2_PC %>%
+  mutate(sociodemo_PC1_resid = CombMeasures_allcog_resid[,"sociodemo_PC1"],
+         home_PC1_resid = CombMeasures_allcog_resid[,"home_PC1"],
+         school_PC1_resid = CombMeasures_allcog_resid[,"school_PC1"],
+         neighborhood_PC1_resid = CombMeasures_allcog_resid[,"neighborhood_PC1"],
+         culture_PC1_resid = CombMeasures_allcog_resid[,"culture_PC1"],
+         Neurocog_BPPC1_GenAbility_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC1_GenAbility"],
+         Neurocog_BPPC2_ExecFunc_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC2_ExecFunc"],
+         Neurocog_BPPC3_LearnMem_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC3_LearnMem"]) 
+
+#Combined Release 2 PCs
+X <- as.matrix(rel2_projrel1_PC[, c("Age", "Male")])
+
+Y <- as.matrix(rel2_projrel1_PC[, c("culture_PC1", "home_PC1", "school_PC1", "neighborhood_PC1", "sociodemo_PC1",
+                                     "Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc", "Neurocog_BPPC3_LearnMem")])
+
+
+lm.ControlDem <- lm(Y ~ X, data = rel2_projrel1_PC)
+CombMeasures_allcog_resid <- lm.ControlDem$residuals
+
+
+rel2_projrel1_PC <- rel2_projrel1_PC %>%
+  mutate(sociodemo_PC1_resid = CombMeasures_allcog_resid[,"sociodemo_PC1"],
+         home_PC1_resid = CombMeasures_allcog_resid[,"home_PC1"],
+         school_PC1_resid = CombMeasures_allcog_resid[,"school_PC1"],
+         neighborhood_PC1_resid = CombMeasures_allcog_resid[,"neighborhood_PC1"],
+         culture_PC1_resid = CombMeasures_allcog_resid[,"culture_PC1"],
+         Neurocog_BPPC1_GenAbility_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC1_GenAbility"],
+         Neurocog_BPPC2_ExecFunc_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC2_ExecFunc"],
+         Neurocog_BPPC3_LearnMem_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC3_LearnMem"]) 
+
+```
+
+
 ## Correlation matrix for Release 1 and 2 PCs
 ```{r}
+## Correlate combined PCs across Rel 1 and Rel 2
+
+rel1_origproj_corr <- cor(rel1_PC, rel1_projrel2_PC[, c(11:18)], method = "spearman") %>%
+  diag()
+
+rel2_origproj_corr <- cor(rel2_PC, rel2_projrel1_PC[, c(11:18)], method = "spearman") %>%
+  diag()
+
+#rel_projcomb_corr_pvals <- cor.test(rel1_PC_projcomb$neighborhood_PC1, rel2_PC_projcomb$neighborhood_PC1, method = "spearman")
 
 ## Release 1.1 and Release 2.0.1  corr plot 
 rel1pc_corr <- cor(first_release_data[, c(81, 78:80, 77, 85:87)])
@@ -1490,7 +1524,7 @@ rel2pc_corr <- cor(second_release_data[, c(81, 78:80, 77, 85:87)])
 relcombpc_corr <- matrix(NA, nrow = 8, ncol = 8)
 relcombpc_corr[lower.tri(relcombpc_corr)] <- rel1pc_corr[lower.tri(rel1pc_corr)]
 relcombpc_corr[upper.tri(relcombpc_corr)] <- rel2pc_corr[upper.tri(rel2pc_corr)]
-diag(relcombpc_corr) <-  0
+diag(relcombpc_corr) <- rel_projcomb_corr  
 
 rel1pc_corr_pvals <- cor.mtest(first_release_data[, c(81, 78:80, 77, 85:87)], method = "spearman")
 rel2pc_corr_pvals <- cor.mtest(second_release_data[,  c(81, 78:80, 77, 85:87)], method = "spearman")
@@ -1500,242 +1534,770 @@ relcompc_corr_pvals[lower.tri(relcompc_corr_pvals)] <- rel1pc_corr_pvals$p[lower
 relcompc_corr_pvals[upper.tri(relcompc_corr_pvals)] <- rel2pc_corr_pvals$p[upper.tri(rel2pc_corr_pvals$p)]
 diag(relcompc_corr_pvals) <- 0
 
-rownames(relcombpc_corr) <- c("Sociodemo_PC", "Home_PC", "School_PC", "Neighborhood_PC", "Culture_PC", "BPPC1_GenAbility", "BPPC2_ExecFunc",
-                              "BPPC3_LearnMem")
-colnames(relcombpc_corr) <- c("Sociodemo", "Home", "School", "Neigh", "Culture", "GenAbil", "ExecFunc",
-                              "LearnMem")
+# rownames(relcombpc_corr) <- c("Sociodemographic PC1", "Home Environment PC1", "School Environment PC1", 
+#                               "Neighborhood Environment PC1", "Culture Environment PC1", "General Ability BPPC", "Executive Function BPPC",
+#                               "Learning/Memory BPPC")
+rownames(relcombpc_corr) <- c(rep("",8))
+# colnames(relcombpc_corr) <- c("Sociodemo", "Home", "School", "Neigh", "Culture", "GenAbil", "ExecFunc",
+#                               "LearnMem")
+colnames(relcombpc_corr) <- c(rep("",8))
+
 #colnames(relcombpc_corr) <- c(rep(" ", 8))
 
 png("relcompc_corrplot.png", res = 700, width = 16000, height = 12000)
 (pc_corrplot <- corrplot(relcombpc_corr, method = 'color', col = corr_color2(100), type = "full", addCoef.col = "black", 
-                         number.cex = 2, diag = FALSE, cl.pos = "r", cl.cex = 1.8, tl.cex = 1.8, tl.col = "black", tl.srt = 0))
-#corrRect(c(9, 4, 3, 30, 7, 3), col = c(color_grey, color_orange, color_blue, color_green, color_red, color_teal), lwd = 6)
+                         number.cex = 3, cl.pos = "r", cl.cex = 1.8, tl.cex = 1.8, tl.col = "black", tl.srt = 0))
+corrRect(c(1, 4, 3), lwd = 5)
 dev.off()
 
 ```
 
 
-# 4. Fit mixed effects models with study site as random effect
+# 4. Fit mixed effects models with study site and family as random effect
 
-## mixed effects models - full sample and release 1 and 2 subsamples
 ```{r}
-library(lmerTest)
-library(optimx)
 
-######  full sample mixed models    ######
 ## General ability
-genabil_homefull_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = full_sample_data,
+genabil_rel1_mixmodel_fam <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) + 
+                                  (1 | family_id), data = first_release_data,
                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
 
-genabil_schoolfull_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = full_sample_data,
-                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-genabil_neighborhoodfull_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                      data = full_sample_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-genabil_culturefull_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                    data = full_sample_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-## Executive functioning
-execfunc_homefull_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = full_sample_data,
-                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_schoolfull_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = full_sample_data,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_neighborhoodfull_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = full_sample_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_culturefull_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                     data = full_sample_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-## Learning/Memory 
-learnmem_homefull_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = full_sample_data,
-                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_schoolfull_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = full_sample_data,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_neighborhoodfull_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = full_sample_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_culturefull_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), data = full_sample_data,
+genabil_rel2_mixmodel_fam <-  lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) + 
+                                 (1 | family_id), data = second_release_data,
                                   control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
 
-
-######  release split mixed models  ######
-## General ability
-genabil_homerel1_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = first_release_data,
-                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-genabil_homerel2_mixmodel <-  lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = second_release_data,
-                                  control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-genabil_schoolrel1_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = first_release_data,
-                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-genabil_schoolrel2_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = second_release_data,
-                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-genabil_neighborhoodrel1_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                      data = first_release_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-genabil_neighborhoodrel2_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                      data = second_release_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-genabil_culturerel1_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                    data = first_release_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-genabil_culturerel2_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                    data = second_release_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-
 ## Executive functioning
-execfunc_homerel1_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = first_release_data,
+execfunc_rel1_mixmodel_fam <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) +
+                                  (1 | family_id), data = first_release_data,
                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-execfunc_homerel2_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = second_release_data,
+
+execfunc_rel2_mixmodel_fam <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) +
+                                  (1 | family_id), data = second_release_data,
                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_schoolrel1_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = first_release_data,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-execfunc_schoolrel2_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = second_release_data,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_neighborhoodrel1_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = first_release_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-execfunc_neighborhoodrel2_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = second_release_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_culturerel1_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                     data = first_release_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-execfunc_culturerel2_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                     data = second_release_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
   
 ## Learning/Memory 
-learnmem_homerel1_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = first_release_data,
+learnmem_rel1_mixmodel_fam <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) + 
+                                  (1 | family_id), data = first_release_data,
                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-learnmem_homerel2_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = second_release_data,
+
+learnmem_rel2_mixmodel_fam <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) +
+                                  (1 | family_id), data = second_release_data,
                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_schoolrel1_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = first_release_data,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-learnmem_schoolrel2_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = second_release_data,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_neighborhoodrel1_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = first_release_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-learnmem_neighborhoodrel2_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = second_release_data, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_culturerel1_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), data = first_release_data,
-                                  control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-learnmem_culturerel2_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), data = second_release_data,
-                                  control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
 
 ```
 
-## Mixed effects models for single family member subsets
+##  summary of MEMs with random effect for family added
 ```{r}
-######  full sample mixed models, family subset    ######
-## General ability
-genabil_homefullfamily_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = full_sample_family,
-                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
+summary(genabil_rel1_mixmodel_fam)
+summary(genabil_rel2_mixmodel_fam)
+summary(execfunc_rel1_mixmodel_fam)
+summary(execfunc_rel2_mixmodel_fam)
+summary(learnmem_rel1_mixmodel_fam)
+summary(learnmem_rel2_mixmodel_fam)
 
-genabil_schoolfullfamily_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = full_sample_family,
-                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-genabil_neighborhoodfullfamily_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                      data = full_sample_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-genabil_culturefullfamily_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                    data = full_sample_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-## Executive functioning
-execfunc_homefullfamily_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = full_sample_family,
-                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_schoolfullfamily_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = full_sample_family,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_neighborhoodfullfamily_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = full_sample_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_culturefullfamily_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                     data = full_sample_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-## Learning/Memory 
-learnmem_homefullfamily_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = full_sample_family,
-                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_schoolfullfamily_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = full_sample_family,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_neighborhoodfullfamily_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = full_sample_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_culturefullfamily_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), data = full_sample_family,
-                                  control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-
-######  release split mixed models, family subset  ######
-## General ability
-genabil_homerel1family_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = first_release_family,
-                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-genabil_homerel2family_mixmodel <-  lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = second_release_family,
-                                  control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-genabil_schoolrel1family_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = first_release_family,
-                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-genabil_schoolrel2family_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = second_release_family,
-                                control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-genabil_neighborhoodrel1family_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                      data = first_release_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-genabil_neighborhoodrel2family_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                      data = second_release_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-genabil_culturerel1family_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                    data = first_release_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-genabil_culturerel2family_mixmodel <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                    data = second_release_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-
-## Executive functioning
-execfunc_homerel1family_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = first_release_family,
-                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-execfunc_homerel2family_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = second_release_family,
-                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_schoolrel1family_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = first_release_family,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-execfunc_schoolrel2family_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = second_release_family,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_neighborhoodrel1family_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = first_release_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-execfunc_neighborhoodrel2family_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = second_release_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-execfunc_culturerel1family_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                     data = first_release_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-execfunc_culturerel2family_mixmodel <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), 
-                                     data = second_release_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-  
-## Learning/Memory 
-learnmem_homerel1family_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = first_release_family,
-                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-learnmem_homerel2family_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*home_PC1_resid + (1 | abcd_site), data = second_release_family,
-                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_schoolrel1family_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = first_release_family,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-learnmem_schoolrel2family_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*school_PC1_resid + (1 | abcd_site), data = second_release_family,
-                                 control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_neighborhoodrel1family_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = first_release_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-learnmem_neighborhoodrel2family_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*neighborhood_PC1_resid + (1 | abcd_site), 
-                                       data = second_release_family, control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-
-learnmem_culturerel1family_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), data = first_release_family,
-                                  control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
-learnmem_culturerel2family_mixmodel <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid*culture_PC1_resid + (1 | abcd_site), data = second_release_family,
-                                  control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
 
 ```
+
+# Get R-square terms for models
+```{r}
+library(MuMIn)
+
+(rsq_genabil_rel1_mixmodel_fam <-  r.squaredGLMM(genabil_rel1_mixmodel_fam))
+(rsq_genabil_rel2_mixmodel_fam <-  r.squaredGLMM(genabil_rel2_mixmodel_fam))
+
+(rsq_execfunc_rel1_mixmodel_fam <- r.squaredGLMM(execfunc_rel1_mixmodel_fam))
+(rsq_execfunc_rel2_mixmodel_fam <- r.squaredGLMM(execfunc_rel2_mixmodel_fam))
+
+(rsq_learnmem_rel1_mixmodel_fam <- r.squaredGLMM(learnmem_rel1_mixmodel_fam))
+(rsq_learnmem_rel2_mixmodel_fam <- r.squaredGLMM(learnmem_rel2_mixmodel_fam))
+
+
+```
+
+
+# Plot interaction
+```{r}
+library(effects)
+library(sjPlot)
+
+genabil_rel1_inter <- allEffects(genabil_rel1_mixmodel_fam)
+genabil_rel2_inter <- allEffects(genabil_rel2_mixmodel_fam)
+
+plot(genabil_rel1_inter, multiline = TRUE, confit = TRUE, ci.style = "bars",
+     main = "General Ability - Release 1 Interactions")
+
+
+plot(genabil_rel2_inter, multiline = TRUE, confit = TRUE, ci.style = "bars",
+     main = "General Ability - Release 2 Interactions")
+
+(genabil_rel1_interplot <- plot_model(genabil_rel1_mixmodel_fam, type = "pred", terms = c("sociodemo_PC1_resid [-6:6]", "neighborhood_PC1_resid")) +
+  theme_blank() +
+    xlab("Sociodemographic Component Score") +
+    ylab("General Cognitive Ability Component Score") +
+    ggtitle("Discovery Sample: Predicted Values of General Cognitive Ability") +
+    scale_colour_discrete(name = "Neighborhood Env. Component Score", 
+                          labels = c("-1 SD (Less Enriched)", "Mean", "+1 SD (More Enriched)")) + 
+    theme(legend.position = "none"))
+
+(genabil_rel2_interplot_legend <- plot_model(genabil_rel2_mixmodel_fam, type = "eff", terms = c("sociodemo_PC1_resid [-6:6]", "neighborhood_PC1_resid")) +
+  theme_blank() +
+    xlab("Sociodemographic Component Score") +
+    ylab("General Cognitive Ability Component Score") +
+    ggtitle("Replication Sample: Predicted Values of General Cognitive Ability") +
+    scale_colour_discrete(name = "Neighborhood Env. Component Score",
+                          labels = c("-1 SD (Less Enriched)", "Mean", "+1 SD (More Enriched)")) + 
+    theme(legend.position = "bottom",
+      legend.text = element_text(size = 8),
+          legend.title = element_text(size = 10)))
+
+(genabil_rel2_interplot <- plot_model(genabil_rel2_mixmodel_fam, type = "pred", terms = c("sociodemo_PC1_resid [-6:6]", "neighborhood_PC1_resid")) +
+  theme_blank() +
+    xlab("Sociodemographic Component Score") +
+    ylab("General Cognitive Ability Component Score") +
+    ggtitle("Replication Sample: Predicted Values of General Cognitive Ability") +
+    scale_colour_discrete(name = "Neighborhood Env. Component Score",
+                          labels = c("-1 SD (Less Enriched)", "Mean", "+1 SD (More Enriched)")) + 
+    theme(legend.position = "none",
+      legend.text = element_text(size = 8),
+          legend.title = element_text(size = 10)))
+
+plot_model(genabil_rel1_mixmodel_fam, type = "int", terms = c("sociodemo_PC1_resid:neighborhood_PC1_resid")) 
+
+plot_model(genabil_rel2_mixmodel_fam, type = "int", terms = c("sociodemo_PC1_resid", "neighborhood_PC1_resid")) 
+
+```
+
+# 5. Supplementary figures 
+
+### Plot hisotgrams for environment, sociodemographic, and cognitive variables
+```{r}
+
+race_eth <- abcd_data %>%
+  dplyr::select(subjectid, race_ethnicity) %>% 
+  mutate(race_ethnicity = factor(race_ethnicity, 
+                                 levels = c("White", "Hispanic", "Black", "Other", "Asian"),
+                                 labels = c("Non-Hispanic White", "Hispanic", "Non-Hispanic Black", "Other", "Non-Hispanic Asian")))
+
+figure_data <- abcd_data_final %>%
+  mutate(release = ifelse(subject_id %in% first_release_subjects[[1]], 1, 2)) %>%
+  left_join(race_eth, by = c("subject_id" = "subjectid"))
+
+```
+
+
+#### Sociodemo histograms
+```{r}
+
+sociodemo_figs <- list()
+
+# Race/Ethnicity
+(sociodemo_figs[[1]] <- figure_data %>%
+  ggplot(., aes(race_ethnicity, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#EBF094", "#EBF094")) +
+    scale_alpha_discrete(range = c(2, 0.45)) + 
+    ylim(0, 3000) +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
+
+# household income
+(sociodemo_figs[[2]] <- figure_data %>%
+  ggplot(., aes(factor(Income), group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#EBF094", "#EBF094")) +
+    scale_alpha_discrete(range = c(2, 0.45)) + 
+    ylim(0, 2000) +
+    ggtitle("") + 
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
+
+# caregiver education
+(sociodemo_figs[[3]] <- figure_data %>%
+  ggplot(., aes(factor(Education), group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#EBF094", "#EBF094")) +
+    scale_alpha_discrete(range = c(2, 0.45)) +
+    ggtitle("") +
+    ylim(0, 2000) +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"), 
+          legend.position = "none"))
+
+(sociodemo_histfig <- grid.arrange(sociodemo_figs[[1]], sociodemo_figs[[2]], sociodemo_figs[[3]],
+                                     heights = c(1, 1, 1),
+                                     nrow = 3))
+
+ggsave('sociodemo_hist.png', sociodemo_histfig, height = 17, width = 10)
+
+```
+
+#### Home environment histograms 
+```{r}
+# (sociodemo_figs_arrange <- grid.arrange(grobs = sociodemo_figs, ncol = 2) )
+# ggsave('sociodemo_figs.png', sociodemo_figs_arrange, height = 9, width = 13)
+
+##### Home #####
+home_figs <- list()
+
+(home_figs[[1]] <- figure_data %>%
+  ggplot(., aes(ParentAcceptance, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#B1D8B7", "#B1D8B7")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(home_figs[[2]] <- figure_data %>%
+  ggplot(., aes(ParentMonitoring, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_histogram(color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#B1D8B7", "#B1D8B7")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(home_figs[[3]] <- figure_data %>%
+  ggplot(., aes(FamConflict_P, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#B1D8B7", "#B1D8B7")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(home_figs[[4]] <- figure_data %>%
+  ggplot(., aes(FamConflict_Y, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(color = "grey", position = "dodge") +
+    theme_classic() +
+    scale_fill_manual(values = c("#B1D8B7", "#B1D8B7")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+
+(home_histfig <- grid.arrange(home_figs[[1]], home_figs[[2]], home_figs[[3]], home_figs[[4]],
+                                     heights = c(1, 1),
+                                     nrow = 2))
+
+ggsave('home_hist.png', home_histfig, height = 17, width = 20)
+
+```
+
+```{r}
+##### School #####
+school_figs <- list()
+
+(school_figs[[1]] <- figure_data %>%
+  ggplot(., aes(SchoolInvolvement, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#7CC644", "#7CC644")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(school_figs[[2]] <- figure_data %>%
+  ggplot(., aes(SchoolEnvironment, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#7CC644", "#7CC644")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(school_figs[[3]] <- figure_data %>%
+  ggplot(., aes(SchoolDisengagement, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#7CC644", "#7CC644")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+
+(school_histfig <- grid.arrange(school_figs[[1]], school_figs[[2]], school_figs[[3]],
+                                     heights = c(1, 1, 1),
+                                     nrow = 3))
+
+ggsave('school_hist.png', school_histfig, height = 17, width = 10)
+
+```
+
+```{r}
+
+##### Neighborhood #####
+neighborhood_figs <- list()
+
+(neighborhood_figs[[1]] <- figure_data %>%
+  ggplot(., aes(ADI_PercFamPoverty, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#16A637", "#16A637")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(neighborhood_figs[[2]] <- figure_data %>%
+  ggplot(., aes(ADI_PercPovBelow138, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#16A637", "#16A637")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(neighborhood_figs[[3]] <- figure_data %>%
+  ggplot(., aes(ADI_PercSingle, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#16A637", "#16A637")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(neighborhood_figs[[4]] <- figure_data %>%
+  ggplot(., aes(ADI_IncDisparityIdx, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#16A637", "#16A637")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(neighborhood_figs[[5]] <- figure_data %>%
+  ggplot(., aes(ADI_MedianFamInc, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#16A637", "#16A637")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(neighborhood_figs[[6]] <- figure_data %>%
+  ggplot(., aes(ADI_PercHOwner, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#16A637", "#16A637")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(neighborhood_figs[[7]] <- figure_data %>%
+  ggplot(., aes(ADI_Edu_HSDip, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#16A637", "#16A637")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(neighborhood_histfig <- grid.arrange(neighborhood_figs[[1]], neighborhood_figs[[2]], neighborhood_figs[[3]],
+                                      neighborhood_figs[[4]], neighborhood_figs[[5]], neighborhood_figs[[6]],
+                                      neighborhood_figs[[7]],
+                                     heights = c(1, 1, 1, 1),
+                                     nrow = 4))
+
+ggsave('neighborhood_hist.png', neighborhood_histfig, height = 17, width = 10)
+
+```
+
+```{r}
+##### Culture #####
+culture_figs <- list()
+
+(culture_figs[[1]] <- figure_data %>%
+  ggplot(., aes(EthIdentExploration, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#116530", "#116530")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(culture_figs[[2]] <- figure_data %>%
+  ggplot(., aes(EthIdentCommitment, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#116530", "#116530")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(culture_figs[[3]] <- figure_data %>%
+  ggplot(., aes(FamObligation, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#116530", "#116530")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(culture_figs[[4]] <- figure_data %>%
+  ggplot(., aes(FamReferent, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#116530", "#116530")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(culture_figs[[5]] <- figure_data %>%
+  ggplot(., aes(FamSupport, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#116530", "#116530")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(culture_figs[[6]] <- figure_data %>%
+  ggplot(., aes(IndepSelfReliance, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values =c("#116530", "#116530")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+(culture_figs[[7]] <- figure_data %>%
+  ggplot(., aes(Religion, group = factor(release), fill = factor(release), alpha = factor(release))) +
+    geom_bar(stat = "count", position = "dodge", color = "grey") +
+    theme_classic() +
+    scale_fill_manual(values = c("#116530", "#116530")) +
+    scale_alpha_discrete(range = c(2, 0.45)) ) 
+    # ylim(0, 3000) +
+    # theme(axis.title.x = element_blank(),
+    #       axis.title.y = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks.length = unit(6, "pt"),
+    #       legend.position = "none"))
+
+
+(culture_figs_arrange <- grid.arrange(grobs = culture_figs, ncol = 2) 
+    )
+
+ggsave('culture_figs.png', culture_figs_arrange, height = 9, width = 13)
+
+
+```
+
+#### Cog histograms 
+```{r}
+##### Cog measures #####
+cog_figs <- list()
+
+for(i in 40:ncol(CombMeasures_resid)){
+  
+  cog_figs[[i-39]] <- ggplot(CombMeasures_resid) +
+    geom_histogram(aes_string(colnames(CombMeasures_resid)[i])) +
+    theme_classic()+
+    theme(text = element_text(size = 5))
+}
+
+(cog_figs_arrange <- grid.arrange(grobs = cog_figs, ncol = 2) 
+    )
+
+ggsave('cog_figs.png', cog_figs_arrange, height = 9, width = 13)
+```
+
+
+### Redo analyses with log transformed income variable 
+```{r}
+
+first_release_data_loginc <- abcd_data_final_loginc %>%
+  filter(subject_id %in% first_release_subjects[[1]]) %>%
+  standardize()
+
+first_release_bppca_loginc <- abcd_data_final_loginc %>%
+  filter(subject_id %in% first_release_subjects[[1]]) %>%
+  dplyr::select(Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem)
+
+second_release_data_loginc <- abcd_data_final_loginc %>%
+  filter(subject_id %nin% first_release_subjects[[1]]) %>%
+  standardize()
+
+second_release_bppca_loginc <- abcd_data_final_loginc %>%
+  filter(subject_id %nin% first_release_subjects[[1]]) %>%
+  dplyr::select(Neurocog_BPPC1_GenAbility, Neurocog_BPPC2_ExecFunc, Neurocog_BPPC3_LearnMem)
+
+
+## Release 1 and Release 2 group PCAs
+
+## Release 1
+rel1_culture_pca_loginc     <- PCA(first_release_data_loginc[CultureEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel1_home_pca_loginc        <- PCA(first_release_data_loginc[HomeEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel1_school_pca_loginc      <- PCA(first_release_data_loginc[SchoolEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel1_neighborhood_pca_loginc <- PCA(first_release_data_loginc[NeighborhoodEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel1_sociodemo_pca_loginc    <- PCA(first_release_data_loginc[SociodemoVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel1_neurocog_pca_loginc    <- PCA(first_release_data_loginc[NeurocogVar_list$V1], scale.unit = TRUE, graph = TRUE)
+
+first_release_data_loginc <- first_release_data_loginc %>%
+        mutate(culture_PC1 = -1 * rel1_culture_pca_loginc$ind$coord[,1],
+               home_PC1 = rel1_home_pca_loginc$ind$coord[,1],
+               school_PC1 = rel1_school_pca_loginc$ind$coord[,1],
+               neighborhood_PC1 = -1 * rel1_neighborhood_pca_loginc$ind$coord[,1],
+               sociodemo_PC1 = rel1_sociodemo_pca_loginc$ind$coord[,1],
+               neurocog_PC1 = rel1_neurocog_pca_loginc$ind$coord[,1],
+               neurocog_PC2 = rel1_neurocog_pca_loginc$ind$coord[,2],
+               neurocog_PC3 = rel1_neurocog_pca_loginc$ind$coord[,3], 
+               Neurocog_BPPC1_GenAbility = first_release_bppca_loginc$Neurocog_BPPC1_GenAbility,
+               Neurocog_BPPC2_ExecFunc = first_release_bppca_loginc$Neurocog_BPPC2_ExecFunc,
+               Neurocog_BPPC3_LearnMem = first_release_bppca_loginc$Neurocog_BPPC3_LearnMem)
+
+
+## Release 2 
+rel2_culture_pca_loginc     <- PCA(second_release_data_loginc[CultureEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel2_home_pca_loginc        <- PCA(second_release_data_loginc[HomeEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel2_school_pca_loginc      <- PCA(second_release_data_loginc[SchoolEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel2_neighborhood_pca_loginc <- PCA(second_release_data_loginc[NeighborhoodEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel2_sociodemo_pca_loginc    <- PCA(second_release_data_loginc[SociodemoVar_list$V1], scale.unit = TRUE, graph = TRUE)
+rel2_neurocog_pca_loginc         <- PCA(second_release_data_loginc[NeurocogVar_list$V1], scale.unit = TRUE, graph = TRUE)
+
+second_release_data_loginc <- second_release_data_loginc %>%
+        mutate(culture_PC1 = -1 * rel2_culture_pca_loginc$ind$coord[,1],
+               home_PC1 = rel2_home_pca_loginc$ind$coord[,1],
+               school_PC1 = rel2_school_pca_loginc$ind$coord[,1],
+               neighborhood_PC1 = -1 * rel2_neighborhood_pca_loginc$ind$coord[,1],
+               sociodemo_PC1 = rel2_sociodemo_pca_loginc$ind$coord[,1],
+               neurocog_PC1 = rel2_neurocog_pca_loginc$ind$coord[,1],
+               neurocog_PC2 = rel2_neurocog_pca_loginc$ind$coord[,2],
+               neurocog_PC3 = rel2_neurocog_pca_loginc$ind$coord[,3],
+               Neurocog_BPPC1_GenAbility = second_release_bppca_loginc$Neurocog_BPPC1_GenAbility,
+               Neurocog_BPPC2_ExecFunc = second_release_bppca_loginc$Neurocog_BPPC2_ExecFunc,
+               Neurocog_BPPC3_LearnMem = second_release_bppca_loginc$Neurocog_BPPC3_LearnMem)
+
+## first release resids
+X <- as.matrix(first_release_data_loginc[c("Age",
+                                "Male")])
+
+Y <- as.matrix(first_release_data_loginc[c("culture_PC1", "home_PC1", "school_PC1", "neighborhood_PC1", "sociodemo_PC1","neurocog_PC1", "neurocog_PC2",
+                                    "neurocog_PC3", "Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc", "Neurocog_BPPC3_LearnMem")])
+
+lm.ControlDem <- lm(Y ~ X, data = first_release_data_loginc)
+CombMeasures_allcog_resid_loginc <- lm.ControlDem$residuals
+
+
+first_release_data_loginc <- first_release_data_loginc %>%
+  mutate(culture_PC1_resid = CombMeasures_allcog_resid_loginc[,"culture_PC1"],
+         home_PC1_resid = CombMeasures_allcog_resid_loginc[,"home_PC1"],
+         school_PC1_resid = CombMeasures_allcog_resid_loginc[,"school_PC1"],
+         neighborhood_PC1_resid = CombMeasures_allcog_resid_loginc[,"neighborhood_PC1"],
+         sociodemo_PC1_resid = CombMeasures_allcog_resid_loginc[,"sociodemo_PC1"],
+         neurocog_PC1_resid = CombMeasures_allcog_resid_loginc[,"neurocog_PC1"],
+         neurocog_PC2_resid = CombMeasures_allcog_resid_loginc[,"neurocog_PC2"],
+         neurocog_PC3_resid = CombMeasures_allcog_resid_loginc[,"neurocog_PC3"],
+         Neurocog_BPPC1_GenAbility_resid = CombMeasures_allcog_resid_loginc[,"Neurocog_BPPC1_GenAbility"],
+         Neurocog_BPPC2_ExecFunc_resid = CombMeasures_allcog_resid_loginc[,"Neurocog_BPPC2_ExecFunc"],
+         Neurocog_BPPC3_LearnMem_resid = CombMeasures_allcog_resid_loginc[,"Neurocog_BPPC3_LearnMem"])
+
+first_release_resid_loginc <- first_release_data_loginc %>%
+  dplyr::select(subject_id, abcd_site, culture_PC1_resid, home_PC1_resid, school_PC1_resid, neighborhood_PC1_resid, 
+                sociodemo_PC1_resid, Neurocog_BPPC1_GenAbility_resid, Neurocog_BPPC2_ExecFunc_resid, Neurocog_BPPC3_LearnMem_resid)
+
+
+## second release resids
+X <- as.matrix(second_release_data_loginc[c("Age",
+                                "Male")])
+
+Y <- as.matrix(second_release_data_loginc[c("culture_PC1", "home_PC1", "school_PC1", "neighborhood_PC1", "sociodemo_PC1","neurocog_PC1", "neurocog_PC2",
+                                    "neurocog_PC3", "Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc", "Neurocog_BPPC3_LearnMem")])
+
+
+lm.ControlDem <- lm(Y ~ X, data = second_release_data_loginc)
+CombMeasures_allcog_resid_loginc <- lm.ControlDem$residuals
+
+
+second_release_data_loginc <- second_release_data_loginc %>%
+  mutate(culture_PC1_resid = CombMeasures_allcog_resid_loginc[,"culture_PC1"],
+         home_PC1_resid = CombMeasures_allcog_resid_loginc[,"home_PC1"],
+         school_PC1_resid = CombMeasures_allcog_resid_loginc[,"school_PC1"],
+         neighborhood_PC1_resid = CombMeasures_allcog_resid_loginc[,"neighborhood_PC1"],
+         sociodemo_PC1_resid = CombMeasures_allcog_resid_loginc[,"sociodemo_PC1"],
+         neurocog_PC1_resid = CombMeasures_allcog_resid_loginc[,"neurocog_PC1"],
+         neurocog_PC2_resid = CombMeasures_allcog_resid_loginc[,"neurocog_PC2"],
+         neurocog_PC3_resid = CombMeasures_allcog_resid_loginc[,"neurocog_PC3"],
+         Neurocog_BPPC1_GenAbility_resid = CombMeasures_allcog_resid_loginc[,"Neurocog_BPPC1_GenAbility"],
+         Neurocog_BPPC2_ExecFunc_resid = CombMeasures_allcog_resid_loginc[,"Neurocog_BPPC2_ExecFunc"],
+         Neurocog_BPPC3_LearnMem_resid = CombMeasures_allcog_resid_loginc[,"Neurocog_BPPC3_LearnMem"])
+
+second_release_resid_loginc <- second_release_data_loginc %>%
+  dplyr::select(subject_id, abcd_site, culture_PC1_resid, home_PC1_resid, school_PC1_resid, neighborhood_PC1_resid, 
+                sociodemo_PC1_resid, Neurocog_BPPC1_GenAbility_resid, Neurocog_BPPC2_ExecFunc_resid, Neurocog_BPPC3_LearnMem_resid)
+
+# release 1 participant loading comparison for standard income var and log transformed
+
+(rel1_sociodemo_logcor <- cor.test(first_release_data$sociodemo_PC1_resid, first_release_data_loginc$sociodemo_PC1_resid, method = "spearman"))
+
+# release 2 
+
+(rel2_sociodemo_logcor <- cor.test(second_release_data$sociodemo_PC1_resid, second_release_data_loginc$sociodemo_PC1_resid, method = "spearman"))
+
+```
+
+### Mixed effects models with log transformed income
+```{r}
+
+## General ability
+genabil_rel1_mixmodel_loginc <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) + 
+                                  (1 | family_id), data = first_release_data_loginc,
+                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
+
+genabil_rel2_mixmodel_loginc <-  lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) + 
+                                 (1 | family_id), data = second_release_data_loginc,
+                                  control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
+
+## Executive functioning
+execfunc_rel1_mixmodel_loginc <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) +
+                                  (1 | family_id), data = first_release_data_loginc,
+                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
+
+execfunc_rel2_mixmodel_loginc <- lmer(Neurocog_BPPC2_ExecFunc_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) +
+                                  (1 | family_id), data = second_release_data_loginc,
+                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
+  
+## Learning/Memory 
+learnmem_rel1_mixmodel_loginc <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) + 
+                                  (1 | family_id), data = first_release_data_loginc,
+                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
+
+learnmem_rel2_mixmodel_loginc <- lmer(Neurocog_BPPC3_LearnMem_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
+                                culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
+                                sociodemo_PC1_resid:neighborhood_PC1_resid + sociodemo_PC1_resid:culture_PC1_resid + (1 | abcd_site) +
+                                  (1 | family_id), data = second_release_data_loginc,
+                               control = lmerControl(optimizer ='optimx', optCtrl=list(method='L-BFGS-B')))
+
+summary(genabil_rel1_mixmodel_loginc)
+summary(genabil_rel2_mixmodel_loginc)
+summary(execfunc_rel1_mixmodel_loginc)
+summary(execfunc_rel2_mixmodel_loginc)
+summary(learnmem_rel1_mixmodel_loginc)
+summary(learnmem_rel2_mixmodel_loginc)
+
+```
+
+## r-squares for ln(income) models
+```{r}
+(rsq_genabil_rel1_mixmodel_loginc <-  r.squaredGLMM(genabil_rel1_mixmodel_loginc))
+(rsq_genabil_rel2_mixmodel_loginc <-  r.squaredGLMM(genabil_rel2_mixmodel_loginc))
+
+(rsq_execfunc_rel1_mixmodel_loginc <- r.squaredGLMM(execfunc_rel1_mixmodel_loginc))
+(rsq_execfunc_rel2_mixmodel_loginc <- r.squaredGLMM(execfunc_rel2_mixmodel_loginc))
+
+(rsq_learnmem_rel1_mixmodel_loginc <- r.squaredGLMM(learnmem_rel1_mixmodel_loginc))
+(rsq_learnmem_rel2_mixmodel_loginc <- r.squaredGLMM(learnmem_rel2_mixmodel_loginc))
+```
+
