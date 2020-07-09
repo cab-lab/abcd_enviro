@@ -57,8 +57,7 @@ library(lmerTest)
 library(optimx)
 library(broom)
 
-
-knitr::opts_knit$set(root.dir = "../../../")
+#knitr::opts_knit$set(root.dir = "../../../")
 
 ```
 
@@ -80,7 +79,7 @@ summary(acculturation_table)
 # 1. Import DEAP Rds file and set up working directories, get subject IDs for Release 1
 ```{r import_data}
 
-abcd_data <- read_rds("~/Documents/data/release2rds/results/ABCD_release2.0.1_update_Rds/nda2.0.1.Rds") %>%
+abcd_data <- full_data %>%
   filter(eventname == "baseline_year_1_arm_1") %>%
   dplyr::select(subjectid, abcd_site, rel_family_id,age, demo_gender_id_p, demo_sex_p, female, race_ethnicity, #general participant info/ sociodemo 
                 demo_comb_income_p,demo_prnt_ed_p, demo_prtnr_ed_p, 
