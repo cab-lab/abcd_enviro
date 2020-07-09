@@ -6,11 +6,15 @@ output: html_document
 ---
 
 Code for:                                                                                               
-  1.  Importing DEAP ABCD RDS file available at ()                                                        
-  2.  Gathering and cleaning relevant environment, sociodemographic, and neurocognitive BPPCAs           
-          - for details on BPPCA, see Thompson et al., (2018). ()                           
-  3.  Computing environment, sociodemographic, amd cognitive PCs                                    
-  4.  Performing mixed effects models for the three cognitive factors separately 
+  1. Importing DEAP ABCD RDS file ('nda2.0.1.Rds') available for download on Midway2 
+            (/project2/abcd/Release2.0.1_Files/DEAP_RDS_2.0.1/release2rds/results/ABCD_release2.0.1_update_Rds.zip)                                                        
+  2. Gathering and cleaning relevant environment, sociodemographic, and neurocognitive BPPCAs           
+          - for details on BPPCA, see Thompson et al., (2019). (https://www.sciencedirect.com/science/article/pii/S1878929318301622)                           
+  3. Computing environment, sociodemographic, amd cognitive PCs for release and site split subsamples   
+  
+  4. Generating three mixed-effects models for the Thompson BPPC cognitive factors
+  
+  5. Supplementary analyses relating site split PCs, re-analyzing using natural log transformed income data, distributions of variable scores
         
         
 ```{r setup, include=FALSE}
@@ -58,11 +62,11 @@ knitr::opts_knit$set(root.dir = "../../../")
 
 ```
 
-## master data set just in case while working 
+## Missingness for other culture vars 
 ```{r}
-test_data <- read_rds("~/Documents/data/release2rds/results/ABCD_release2.0.1_update_Rds/nda2.0.1.Rds")
+full_data <- read_rds("~/Documents/data/release2rds/results/ABCD_release2.0.1_update_Rds/nda2.0.1.Rds")
 
-acculturation_data <- test_data %>%
+acculturation_data <- full_data %>%
   filter(eventname == "baseline_year_1_arm_1") %>%
   dplyr::select(via_accult_ss_hc_p, via_accult_ss_amer_p, accult_phenx_q1, accult_phenx_q2, accult_phenx_q3_dropdwn,
                accult_phenx_q4, accult_phenx_q5, accult_phenx_q1_p, accult_phenx_q2_p, accult_phenx_q3_dropdwn_p,
@@ -345,15 +349,15 @@ abcd_stats_total_rel2 <- abcd_stats_total %>%
 
 abcd_stats_totaltab_rel1 <- CreateTableOne(data = abcd_stats_total_rel1)
 abcd_stats_summarytab_rel1 <- summary(abcd_stats_totaltab_rel1)
-sink("abcd_missing_table_rel1.txt")
+sink("abcd_missingtable_rel1.csv")
 print(summary(abcd_stats_totaltab_rel1), quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
 sink()
 
-test <- data.frame(unclass(summary(abcd_stats_totaltab_rel1)), check.names = FALSE, stringsAsFactors = FALSE)
 
 abcd_stats_totaltab_rel2 <- CreateTableOne(data = abcd_stats_total_rel2)
-abcd_stats_summarytab_rel2 <- summary(abcd_stats_totaltab_rel2)
-write.csv(abcd_stats_summarytab_rel2, file = "abcd_missing_table_rel2.csv")
+sink("abcd_missingtable_rel2.csv")
+print(summary(abcd_stats_totaltab_rel2), quote = FALSE, noSpaces = TRUE, printToggle = FALSE)
+sink()
 
 abcd_stats_rel1_complete <- abcd_stats_total_rel1[complete.cases(abcd_stats_total_rel1),]
 abcd_stats_rel2_complete <- abcd_stats_total_rel2[complete.cases(abcd_stats_total_rel2),]
@@ -433,34 +437,8 @@ for (i in 1:nrand){
 ```
 
 
-# 3. Run PCA for environmental factors, sociodemographic factors, and neurocognitive scores- full and split samples
+# 3. Run PCA for environmental factors, sociodemographic factors, and neurocognitive scores in each subsample
 ```{r message=FALSE, warning=FALSE}
-## full sample PCAs
-full_sample_data <- abcd_data_final %>% standardize()
-
-full_culture_pca     <- PCA(full_sample_data[CultureEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-full_home_pca        <- PCA(full_sample_data[HomeEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-full_school_pca      <- PCA(full_sample_data[SchoolEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-full_neighborhood_pca <- PCA(full_sample_data[NeighborhoodEnvVar_list$V1], scale.unit = TRUE, graph = TRUE)
-full_sociodemo_pca    <- PCA(full_sample_data[SociodemoVar_list$V1], scale.unit = TRUE, graph = TRUE)
-full_neurocog_pca    <- PCA(full_sample_data[NeurocogVar_list$V1], scale.unit = TRUE, graph = TRUE)
-
-full_sample_data <- full_sample_data %>%
-        mutate(culture_PC1 = -1 * full_culture_pca$ind$coord[,1],
-               home_PC1 = full_home_pca$ind$coord[,1],
-               school_PC1 = full_school_pca$ind$coord[,1],
-               neighborhood_PC1 = -1 * full_neighborhood_pca$ind$coord[,1],
-               sociodemo_PC1 = full_sociodemo_pca$ind$coord[,1],
-               neurocog_PC1 = full_neurocog_pca$ind$coord[,1],
-               neurocog_PC2 = full_neurocog_pca$ind$coord[,2],
-               neurocog_PC3 = full_neurocog_pca$ind$coord[,3],
-               Neurocog_BPPC1_GenAbility = abcd_data_final$Neurocog_BPPC1_GenAbility,
-               Neurocog_BPPC2_ExecFunc = abcd_data_final$Neurocog_BPPC2_ExecFunc,
-               Neurocog_BPPC3_LearnMem = abcd_data_final$Neurocog_BPPC3_LearnMem)
-
-write_csv(full_sample_data,
-          "/Users/wesleymeredith/Documents/github_repos/shared_abcd_enviro/abcd_enviro/enviro_output/abcd_enviro_fullsample.csv")
-
 ## Release 1 and Release 2 group PCAs
 
 ## Release 1
@@ -659,36 +637,6 @@ fviz_screeplot(rel2_neurocog_pca, addlabels =TRUE) +
 
 ## Regress out age and sex from PC participant loadings
 ```{r}
-## full sample resids
-X <- as.matrix(full_sample_data[c("Age",
-                                "Male")])
-
-Y <- as.matrix(full_sample_data[c("culture_PC1", "home_PC1", "school_PC1", "neighborhood_PC1", "sociodemo_PC1","neurocog_PC1", "neurocog_PC2",
-                                    "neurocog_PC3", "Neurocog_BPPC1_GenAbility", "Neurocog_BPPC2_ExecFunc", "Neurocog_BPPC3_LearnMem")])
-
-lm.ControlDem <- lm(Y ~ X, data = full_sample_data)
-CombMeasures_allcog_resid <- lm.ControlDem$residuals
-
-
-full_sample_data <- full_sample_data %>%
-  mutate(culture_PC1_resid = CombMeasures_allcog_resid[,"culture_PC1"],
-         home_PC1_resid = CombMeasures_allcog_resid[,"home_PC1"],
-         school_PC1_resid = CombMeasures_allcog_resid[,"school_PC1"],
-         neighborhood_PC1_resid = CombMeasures_allcog_resid[,"neighborhood_PC1"],
-         sociodemo_PC1_resid = CombMeasures_allcog_resid[,"sociodemo_PC1"],
-         neurocog_PC1_resid = CombMeasures_allcog_resid[,"neurocog_PC1"],
-         neurocog_PC2_resid = CombMeasures_allcog_resid[,"neurocog_PC2"],
-         neurocog_PC3_resid = CombMeasures_allcog_resid[,"neurocog_PC3"],
-         Neurocog_BPPC1_GenAbility_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC1_GenAbility"],
-         Neurocog_BPPC2_ExecFunc_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC2_ExecFunc"],
-         Neurocog_BPPC3_LearnMem_resid = CombMeasures_allcog_resid[,"Neurocog_BPPC3_LearnMem"])
-
-full_sample_resid <- full_sample_data %>%
-  dplyr::select(subject_id, abcd_site, culture_PC1_resid, home_PC1_resid, school_PC1_resid, neighborhood_PC1_resid, 
-                sociodemo_PC1_resid, Neurocog_BPPC1_GenAbility_resid, Neurocog_BPPC2_ExecFunc_resid, Neurocog_BPPC3_LearnMem_resid)
-
-write.csv(full_sample_resid, 'ABCD_fullsample_PCresid.csv', row.names = FALSE)
-
 ## first release resids
 X <- as.matrix(first_release_data[c("Age",
                                 "Male")])
@@ -752,7 +700,7 @@ write.csv(second_release_resid, 'ABCD_release2_PCresid.csv', row.names = FALSE)
 
 ```
 
-## Regress out age and sex from enviro/sociodem vars and compare participant loadings with the regressed loadings above
+## Regress out age and sex from enviro/sociodem vars first and compare participant loadings with the regressed PC loadings above
 ```{r}
 # first release
 first_release_varresid_data <- first_release_data %>%
@@ -1045,123 +993,6 @@ rel2_sociodemo_pccontrib$Contribution[rel2_negative_dir_sociodemo] <- -1 * rel2_
 
 ggsave("rel2_sociodemo_pccontrib_plot.png")
 
-# cog scores - PC 1 
-## rel 1.1 full_neurocog_pca
-rel1_neurocog1_pccontrib <- data.table(Contribution = rel1_neurocog_pca$var$contrib[,1]) %>%
-        mutate(Variable = rownames(rel1_neurocog_pca$var$contrib))
-
-rel1_neurocog1_pcdirect <- data.table(Coord = rel1_neurocog_pca$var$coord[,1]) %>%
-        mutate(Variable = rownames(rel1_neurocog_pca$var$coord))
-
-rel1_negative_dir_neurocog1 <- which(rel1_neurocog1_pcdirect$Coord < 0)
-rel1_neurocog1_pccontrib$Contribution[rel1_negative_dir_neurocog1] <- -1 * rel1_neurocog1_pccontrib$Contribution[rel1_negative_dir_neurocog1]
-
-(rel1_neurocog1_pccontrib_plot <- rel1_neurocog1_pccontrib %>%
-                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
-    scale_y_continuous(limits = c(-35, 45)) +
-                coord_flip() +
-                pc_theme )
-
-ggsave("rel1_neurocog1_pccontrib_plot.png")
-
-## rel 2.0.1 
-rel2_neurocog1_pccontrib <- data.table(Contribution = rel2_neurocog_pca$var$contrib[,1]) %>%
-        mutate(Variable = rownames(rel2_neurocog_pca$var$contrib))
-
-rel2_neurocog1_pcdirect <- data.table(Coord = rel2_neurocog_pca$var$coord[,1]) %>%
-        mutate(Variable = rownames(rel2_neurocog_pca$var$coord))
-
-rel2_negative_dir_neurocog1 <- which(rel2_neurocog1_pcdirect$Coord < 0)
-rel2_neurocog1_pccontrib$Contribution[rel2_negative_dir_neurocog1] <- -1 * rel2_neurocog1_pccontrib$Contribution[rel2_negative_dir_neurocog1]
-
-(rel2_neurocog1_pccontrib_plot <- rel2_neurocog1_pccontrib %>%
-                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
-    scale_y_continuous(limits = c(-35, 45)) +
-                coord_flip() +
-                pc_theme )
-
-ggsave("rel2_neurocog1_pccontrib_plot.png")
-
-# cog scores - PC 2 
-## rel 1.1 full_neurocog_pca
-rel1_neurocog2_pccontrib <- data.table(Contribution = rel1_neurocog_pca$var$contrib[,2]) %>%
-        mutate(Variable = rownames(rel1_neurocog_pca$var$contrib))
-
-rel1_neurocog2_pcdirect <- data.table(Coord = rel1_neurocog_pca$var$coord[,2]) %>%
-        mutate(Variable = rownames(rel1_neurocog_pca$var$coord))
-
-rel1_negative_dir_neurocog2 <- which(rel1_neurocog2_pcdirect$Coord < 0)
-rel1_neurocog2_pccontrib$Contribution[rel1_negative_dir_neurocog2] <- -1 * rel1_neurocog2_pccontrib$Contribution[rel1_negative_dir_neurocog2]
-
-(rel1_neurocog2_pccontrib_plot <- rel1_neurocog2_pccontrib %>%
-                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
-    scale_y_continuous(limits = c(-35, 45)) +
-                coord_flip() +
-                pc_theme )
-
-ggsave("rel1_neurocog2_pccontrib_plot.png")
-
-## rel 2.0.1 
-rel2_neurocog2_pccontrib <- data.table(Contribution = rel2_neurocog_pca$var$contrib[,2]) %>%
-        mutate(Variable = rownames(rel2_neurocog_pca$var$contrib))
-
-rel2_neurocog2_pcdirect <- data.table(Coord = rel2_neurocog_pca$var$coord[,2]) %>%
-        mutate(Variable = rownames(rel2_neurocog_pca$var$coord))
-
-rel2_negative_dir_neurocog2 <- which(rel2_neurocog2_pcdirect$Coord < 0)
-rel2_neurocog2_pccontrib$Contribution[rel2_negative_dir_neurocog2] <- -1 * rel2_neurocog2_pccontrib$Contribution[rel2_negative_dir_neurocog2]
-
-(rel2_neurocog2_pccontrib_plot <- rel2_neurocog2_pccontrib %>%
-                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
-    scale_y_continuous(limits = c(-35, 45)) +
-                coord_flip() +
-                pc_theme )
-
-ggsave("rel2_neurocog2_pccontrib_plot.png")
-
-# cog scores - PC 3 
-## rel 1.1 full_neurocog_pca
-rel1_neurocog3_pccontrib <- data.table(Contribution = rel1_neurocog_pca$var$contrib[,3]) %>%
-        mutate(Variable = rownames(rel1_neurocog_pca$var$contrib))
-
-rel1_neurocog3_pcdirect <- data.table(Coord = rel1_neurocog_pca$var$coord[,3]) %>%
-        mutate(Variable = rownames(rel1_neurocog_pca$var$coord))
-
-rel1_negative_dir_neurocog3 <- which(rel1_neurocog3_pcdirect$Coord < 0)
-rel1_neurocog3_pccontrib$Contribution[rel1_negative_dir_neurocog3] <- -1 * rel1_neurocog3_pccontrib$Contribution[rel1_negative_dir_neurocog3]
-
-(rel1_neurocog3_pccontrib_plot <- rel1_neurocog3_pccontrib %>%
-                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
-    scale_y_continuous(limits = c(-35, 45)) +
-                coord_flip() +
-                pc_theme )
-
-ggsave("rel1_neurocog3_pccontrib_plot.png")
-
-## rel 2.0.1 
-rel2_neurocog3_pccontrib <- data.table(Contribution = rel2_neurocog_pca$var$contrib[,3]) %>%
-        mutate(Variable = rownames(rel2_neurocog_pca$var$contrib))
-
-rel2_neurocog3_pcdirect <- data.table(Coord = rel2_neurocog_pca$var$coord[,3]) %>%
-        mutate(Variable = rownames(rel2_neurocog_pca$var$coord))
-
-rel2_negative_dir_neurocog3 <- which(rel2_neurocog3_pcdirect$Coord < 0)
-rel2_neurocog3_pccontrib$Contribution[rel2_negative_dir_neurocog3] <- -1 * rel2_neurocog3_pccontrib$Contribution[rel2_negative_dir_neurocog3]
-
-(rel2_neurocog3_pccontrib_plot <- rel2_neurocog3_pccontrib %>%
-                ggplot(aes(x = reorder(Variable, Contribution), y = Contribution)) +
-                geom_bar(stat = "identity", position = "dodge", fill = color_cog) +
-    scale_y_continuous(limits = c(-35, 45)) +
-                coord_flip() +
-                pc_theme )
-
-ggsave("rel2_neurocog3_pccontrib_plot.png")
-
 ```
 
 ## Combine plots for Release 1 and 2 PCs
@@ -1208,13 +1039,9 @@ ggsave('relplot_pcfig3.png', relplot_pcfig, height = 17, width = 14)
 
 ```
 
-## Compare BPPCA and PCA results for neurocognitive scores for complete case participants
+## Compare BPPCA and PCA results for neurocognitive scores in complete case subsamples
 ```{r}
-
 # Cor test for Neurocog PC1 and Neurocog BPPC1 
-## all subjects 
-(neurocog1_corr <- cor.test(full_sample_data$neurocog_PC1, full_sample_data$Neurocog_BPPC1_GenAbility, method = "spearman"))
-
 ## Release 1.1 
 (neurocog1_rel1_corr <- cor.test(first_release_data$neurocog_PC1, first_release_data$Neurocog_BPPC1_GenAbility, method = "spearman"))
 
@@ -1222,9 +1049,6 @@ ggsave('relplot_pcfig3.png', relplot_pcfig, height = 17, width = 14)
 (neurocog1_rel2_corr <- cor.test(second_release_data$neurocog_PC1, second_release_data$Neurocog_BPPC1_GenAbility, method = "spearman"))
 
 # Cor test for Neurocog PC2 and Neurocog BPPC2 
-## all subjects 
-(neurocog2_corr <- cor.test(full_sample_data$neurocog_PC2, full_sample_data$Neurocog_BPPC2_ExecFunc, method = "spearman"))
-
 ## Release 1.1 
 (neurocog2_rel1_corr <- cor.test(first_release_data$neurocog_PC2, first_release_data$Neurocog_BPPC2_ExecFunc , method = "spearman"))
 
@@ -1232,9 +1056,6 @@ ggsave('relplot_pcfig3.png', relplot_pcfig, height = 17, width = 14)
 (neurocog2_rel2_corr <- cor.test(second_release_data$neurocog_PC2, second_release_data$Neurocog_BPPC2_ExecFunc , method = "spearman"))
 
 # Cor test for Neurocog PC3 and Neurocog BPPC3
-## all subjects 
-(neurocog3_corr <- cor.test(full_sample_data$neurocog_PC3, full_sample_data$Neurocog_BPPC3_LearnMem, method = "spearman"))
-
 ## Release 1.1 
 (neurocog3_rel1_corr <- cor.test(first_release_data$neurocog_PC3, first_release_data$Neurocog_BPPC3_LearnMem , method = "spearman"))
 
@@ -1243,90 +1064,96 @@ ggsave('relplot_pcfig3.png', relplot_pcfig, height = 17, width = 14)
 
 ```
 
-
-
 ## Compare variable loadings across site splits
-
 ```{r}
-rel1pc_corr_pvals <- cor.mtest(first_release_data[, c(81, 78:80, 77, 85:87)], method = "spearman")
-(cor.test(full_sample_data$neurocog_PC1, full_sample_data$Neurocog_BPPC1_GenAbility, method = "spearman"))
-
 # culture 
 site_culture_corr <- diag(cor(site1_culture_varload, site2_culture_varload, method = "pearson"))
-
-#site_culture_corr_pval <- cor.mtest(site1_culture_varload, site2_culture_varload, method = "pearson")
+mean(site_culture_corr)
+sd(site_culture_corr)
+max(site_culture_corr)
+min(site_culture_corr)
 
 # home 
-site_home_corr <- cor(site1_home_varload, site2_home_varload, method = "pearson")
 
-#site_home_corr_pval <- cor.mtest(site1_home_varload, site2_home_varload, method = "pearson")
-
-#school
-site1_school_corr <- cor(site1_school_varload, method = "pearson")
-site2_school_corr <- cor(site2_school_varload, method = "pearson")
-
-site1_school_corr_pval <- cor.mtest(site1_school_varload, method = "pearson")
-site2_school_corr_pval <- cor.mtest(site2_school_varload, method = "pearson")
-
-#neighborhood
-site1_neighborhood_corr <- cor(site1_neighborhood_varload, method = "pearson")
-site2_neighborhood_corr <- cor(site2_neighborhood_varload, method = "pearson")
-
-site1_neighborhood_corr_pval <- cor.mtest(site1_neighborhood_varload, method = "pearson")
-site2_neighborhood_corr_pval <- cor.mtest(site2_neighborhood_varload, method = "pearson")
-
-#sociodemo
-site1_sociodemo_corr <- cor(site1_sociodemo_varload, method = "pearson")
-site2_sociodemo_corr <- cor(site2_sociodemo_varload, method = "pearson")
-
-site1_sociodemo_corr_pval <- cor.mtest(site1_sociodemo_varload, method = "pearson")
-site2_sociodemo_corr_pval <- cor.mtest(site2_sociodemo_varload, method = "pearson")
-
-##### average correlation coef for site split variable loadings #####
-#culture
-site1_culture_corr_avg <- mean(site1_culture_corr[lower.tri(site1_culture_corr)])
-c(site1_culture_corr_avg, max(site1_culture_corr_pval$p[lower.tri(site1_culture_corr_pval$p)]), 
-  min(site1_culture_corr_pval$p[lower.tri(site1_culture_corr_pval$p)]))
-
-site2_culture_corr_avg <- mean(site2_culture_corr[lower.tri(site2_culture_corr)])
-c(site2_culture_corr_avg, max(site2_culture_corr_pval$p[lower.tri(site2_culture_corr_pval$p)]), 
-  min(site2_culture_corr_pval$p[lower.tri(site2_culture_corr_pval$p)]))
-
-#home
-site1_home_corr_avg <- mean(site1_home_corr[lower.tri(site1_home_corr)])
-c(site1_home_corr_avg, max(site1_home_corr_pval$p[lower.tri(site1_home_corr_pval$p)]), 
-  min(site1_home_corr_pval$p[lower.tri(site1_home_corr_pval$p)]))
-
-site2_home_corr_avg <- mean(site2_home_corr[lower.tri(site2_home_corr)])
-c(site2_home_corr_avg, max(site2_home_corr_pval$p[lower.tri(site2_home_corr_pval$p)]), 
-  min(site2_home_corr_pval$p[lower.tri(site2_home_corr_pval$p)]))
+site_home_corr <- diag(cor(site1_home_varload, site2_home_varload, method = "pearson"))
+mean(site_home_corr)
+sd(site_home_corr)
+max(site_home_corr)
+min(site_home_corr)
 
 #school
-site1_school_corr_avg <- mean(site1_school_corr[lower.tri(site1_school_corr)])
-c(site1_school_corr_avg, max(site1_school_corr_pval$p[lower.tri(site1_school_corr_pval$p)]), 
-  min(site1_school_corr_pval$p[lower.tri(site1_school_corr_pval$p)]))
-
-site2_school_corr_avg <- mean(site2_school_corr[lower.tri(site2_school_corr)])
-c(site2_school_corr_avg, max(site2_school_corr_pval$p[lower.tri(site2_school_corr_pval$p)]), 
-  min(site2_school_corr_pval$p[lower.tri(site2_school_corr_pval$p)]))
+site_school_corr <- diag(cor(site1_school_varload, site2_school_varload, method = "pearson"))
+mean(site_school_corr)
+sd(site_school_corr)
+max(site_school_corr)
+min(site_school_corr)
 
 #neighborhood
-site1_neighborhood_corr_avg <- mean(site1_neighborhood_corr[lower.tri(site1_neighborhood_corr)])
-c(site1_neighborhood_corr_avg, max(site1_neighborhood_corr_pval$p[lower.tri(site1_neighborhood_corr_pval$p)]), 
-  min(site1_neighborhood_corr_pval$p[lower.tri(site1_neighborhood_corr_pval$p)]))
-
-site2_neighborhood_corr_avg <- mean(site2_neighborhood_corr[lower.tri(site2_neighborhood_corr)])
-c(site2_neighborhood_corr_avg, max(site2_neighborhood_corr_pval$p[lower.tri(site2_neighborhood_corr_pval$p)]), 
-  min(site2_neighborhood_corr_pval$p[lower.tri(site2_neighborhood_corr_pval$p)]))
+site_neighborhood_corr <- diag(cor(site1_neighborhood_varload, site2_neighborhood_varload, method = "pearson"))
+mean(site_neighborhood_corr)
+sd(site_neighborhood_corr)
+max(site_neighborhood_corr)
+min(site_neighborhood_corr)
 
 #sociodemo
-site1_sociodemo_corr_avg <- mean(site1_sociodemo_corr[lower.tri(site1_sociodemo_corr)])
-c(site1_sociodemo_corr_avg, max(site1_sociodemo_corr_pval$p[lower.tri(site1_sociodemo_corr_pval$p)]), 
-  min(site1_sociodemo_corr_pval$p[lower.tri(site1_sociodemo_corr_pval$p)]))
+site_sociodemo_corr <- diag(cor(site1_sociodemo_varload, site2_sociodemo_varload, method = "pearson"))
+mean(site_sociodemo_corr)
+sd(site_sociodemo_corr)
+max(site_sociodemo_corr)
+min(site_sociodemo_corr)
 
-site2_sociodemo_corr_avg <- mean(site2_sociodemo_corr[lower.tri(site2_sociodemo_corr)])
-c(site2_sociodemo_corr_avg, max(site2_sociodemo_corr_pval$p[lower.tri(site2_sociodemo_corr_pval$p)]), 
-  min(site2_sociodemo_corr_pval$p[lower.tri(site2_sociodemo_corr_pval$p)]))
+#distributions of corr coef 
+(histogram(site_neighborhood_corr))
+(histogram(site_school_corr))
+(histogram(site_culture_corr))
+(histogram(site_home_corr))
+(histogram(site_sociodemo_corr))
+
+site_corr_dist <- data.frame(site_neighborhood_corr,site_school_corr,site_culture_corr,site_home_corr,site_sociodemo_corr )
+
+site_corr_distplots <- list()
+
+(site_corr_distplots[[1]] <- site_corr_dist %>%
+  ggplot(aes(x = site_sociodemo_corr)) + 
+  geom_histogram(bins = 40, fill = color_sociodem, color = "black") +
+    theme_blank() +
+    theme(axis.title = element_blank(),
+          axis.text = element_text(size = 15, color = "black")))
+
+(site_corr_distplots[[2]] <- site_corr_dist %>%
+  ggplot(aes(x = site_home_corr)) + 
+  geom_histogram(bins = 40, fill = color_home, color = "black") +
+    theme_blank() +
+    theme(axis.title = element_blank(),
+          axis.text = element_text(size = 15, color = "black")))
+
+(site_corr_distplots[[3]] <- site_corr_dist %>%
+  ggplot(aes(x = site_school_corr)) + 
+  geom_histogram(bins = 40, fill = color_school, color = "black") +
+    theme_blank() +
+    theme(axis.title = element_blank(),
+          axis.text = element_text(size = 15, color = "black")))
+
+(site_corr_distplots[[4]] <- site_corr_dist %>%
+  ggplot(aes(x = site_neighborhood_corr)) + 
+  geom_histogram(bins = 40, fill = color_neighborhood, color = "black") +
+    theme_blank() +
+    theme(axis.title = element_blank(),
+          axis.text = element_text(size = 15, color = "black")))
+
+(site_corr_distplots[[5]] <- site_corr_dist %>%
+  ggplot(aes(x = site_culture_corr)) + 
+  geom_histogram(bins = 40, fill = color_culture, color = "black") +
+    theme_blank() +
+    theme(axis.title = element_blank(),
+          axis.text = element_text(size = 15, color = "black")))
+
+plot_margin <- theme(plot.margin = unit(c(1,2,2,2), "cm"))
+(site_corrdist_fig <- grid.arrange(grobs = lapply(site_corr_distplots, "+", plot_margin),
+                                     heights = c(1, 1, 1),
+                                     nrow = 3))
+
+ggsave('site_corrdist_fig.png', site_corrdist_fig, height = 17, width = 17)
 
 
 ```
@@ -1357,28 +1184,18 @@ relcom_corr_pvals[lower.tri(relcom_corr_pvals)] <- rel1var_corr_pvals$p[lower.tr
 relcom_corr_pvals[upper.tri(relcom_corr_pvals)] <- rel2var_corr_pvals$p[upper.tri(rel2var_corr_pvals$p)]
 diag(relcom_corr_pvals) <- 0
 
-# rownames(relcomb_corr) <- c("White", "Black", "Hispanic", "Asian", "Other Race", "Household Income", "Caregiver Education", "Family Conflict (Parent)",
-#                             "Parent Monitoring", "Family Conflict (Youth)", "Parent Acceptance", "School Environment", "School Involvement", "School Disengagement",
-#                             "Neighborhood Safety (Parent)", "Neighborhood Safety (Youth)", "Walkability", "NO2 Exposure", "PM25 Exposure","Proximity to Roads (log)",
-#                             "Residential Density (log)", "Violent Crime Rate (log)", "Drug Abuse Rate (log)", "Drug Sales Rate (log)", "Drug Possession Rate (log)",
-#                             "DUI Rate (log)", "Marijuana Sales Rate (log)", "Education < HS", "Education - HS Diploma", "Occupation- White Collar",
-#                             "Median Family Income",  "Income Disparity Index", "Median Home Value", "Median Gross Rent", "Median Monthly Mortgage",
-#                             "Home Ownership (%)","Unemployed (%)","Families in Poverty (%)", "Below Povery Line (%)","Single/Not Married (%)",
-#                             "Car Ownership (%, log)", "Telephone in Home (%, log)", "Plumbing in Home (%, log)", "Overcrowding (%)",
-#                             "Ethnic Identity Exploration", "Ethnic Identity Commitment", "Family Obligation", "Family as Referent", "Family Support",
-#                             "Indepence/SelfReliance", "Religion", "Cog - General Ability", "Cog - Executive Function", "Cog - Learning/Memory")
-
 rownames(relcomb_corr) <- c(rep("",54))
 colnames(relcomb_corr) <- c(rep(" ", 54))
 
 png("relcom_corrplot.png", res = 700, width = 16000, height = 12000)
-(variable_corrplot <- corrplot(relcomb_corr, method = 'color', col = corr_color2(100), type = "full", diag = FALSE, cl.pos = "r", cl.cex = 1.8, tl.cex = 1.8, tl.col = "black", tl.srt = 0))
-#corrRect(c(7, 4, 3, 30, 7, 3), lwd = 6)
+(variable_corrplot <- corrplot(relcomb_corr, method = 'color', col = corr_color2(100), type = "full", 
+                               diag = FALSE, cl.pos = "r", cl.cex = 1.8, tl.cex = 1.8, tl.col = "black", tl.srt = 0))
 dev.off()
+
 
 ```
 
-## Project release 1 and release 2 participants through other PC
+## Project release 1 and release 2 participants through corresponding comparison PC (e.g. rel 1 culture project through rel 2 culture)
 ```{r}
 ##### project release 1.1 participants through release 2.0.1 PCs #####
 ### home  ###
@@ -1414,7 +1231,6 @@ rel2_projrel1_culture <- predict.PCA(rel1_culture_pca, second_release_data[Cultu
 rel2_projrel1_sociodemo <- predict.PCA(rel1_sociodemo_pca, second_release_data[SociodemoVar_list$V1])
 
 ##### combine projected and original participant weights #####
-
 rel1_projrel2_PC <- data.table(home_PC1 = rel1_projrel2_home$coord[,1],
                             school_PC1 = rel1_projrel2_school$coord[,1],
                             neighborhood_PC1 = -1 * rel1_projrel2_neighborhood$coord[,1],
@@ -1508,14 +1324,12 @@ rel2_projrel1_PC <- rel2_projrel1_PC %>%
 ## Correlation matrix for Release 1 and 2 PCs
 ```{r}
 ## Correlate combined PCs across Rel 1 and Rel 2
-
 rel1_origproj_corr <- cor(rel1_PC, rel1_projrel2_PC[, c(11:18)], method = "spearman") %>%
   diag()
 
 rel2_origproj_corr <- cor(rel2_PC, rel2_projrel1_PC[, c(11:18)], method = "spearman") %>%
   diag()
 
-#rel_projcomb_corr_pvals <- cor.test(rel1_PC_projcomb$neighborhood_PC1, rel2_PC_projcomb$neighborhood_PC1, method = "spearman")
 
 ## Release 1.1 and Release 2.0.1  corr plot 
 rel1pc_corr <- cor(first_release_data[, c(81, 78:80, 77, 85:87)])
@@ -1534,15 +1348,9 @@ relcompc_corr_pvals[lower.tri(relcompc_corr_pvals)] <- rel1pc_corr_pvals$p[lower
 relcompc_corr_pvals[upper.tri(relcompc_corr_pvals)] <- rel2pc_corr_pvals$p[upper.tri(rel2pc_corr_pvals$p)]
 diag(relcompc_corr_pvals) <- 0
 
-# rownames(relcombpc_corr) <- c("Sociodemographic PC1", "Home Environment PC1", "School Environment PC1", 
-#                               "Neighborhood Environment PC1", "Culture Environment PC1", "General Ability BPPC", "Executive Function BPPC",
-#                               "Learning/Memory BPPC")
 rownames(relcombpc_corr) <- c(rep("",8))
-# colnames(relcombpc_corr) <- c("Sociodemo", "Home", "School", "Neigh", "Culture", "GenAbil", "ExecFunc",
-#                               "LearnMem")
 colnames(relcombpc_corr) <- c(rep("",8))
 
-#colnames(relcombpc_corr) <- c(rep(" ", 8))
 
 png("relcompc_corrplot.png", res = 700, width = 16000, height = 12000)
 (pc_corrplot <- corrplot(relcombpc_corr, method = 'color', col = corr_color2(100), type = "full", addCoef.col = "black", 
@@ -1553,7 +1361,7 @@ dev.off()
 ```
 
 
-# 4. Fit mixed effects models with study site and family as random effect
+# 4. Fit mixed-effects models with study site and family as random effect
 
 ```{r}
 
@@ -1642,8 +1450,9 @@ plot(genabil_rel1_inter, multiline = TRUE, confit = TRUE, ci.style = "bars",
 plot(genabil_rel2_inter, multiline = TRUE, confit = TRUE, ci.style = "bars",
      main = "General Ability - Release 2 Interactions")
 
-(genabil_rel1_interplot <- plot_model(genabil_rel1_mixmodel_fam, type = "pred", terms = c("sociodemo_PC1_resid [-6:6]", "neighborhood_PC1_resid")) +
-  theme_blank() +
+(genabil_rel1_interplot <- plot_model(genabil_rel1_mixmodel_fam, type = "pred", 
+                                      terms = c("sociodemo_PC1_resid [-6:6]", "neighborhood_PC1_resid")) +
+    theme_blank() +
     xlab("Sociodemographic Component Score") +
     ylab("General Cognitive Ability Component Score") +
     ggtitle("Discovery Sample: Predicted Values of General Cognitive Ability") +
@@ -1651,7 +1460,8 @@ plot(genabil_rel2_inter, multiline = TRUE, confit = TRUE, ci.style = "bars",
                           labels = c("-1 SD (Less Enriched)", "Mean", "+1 SD (More Enriched)")) + 
     theme(legend.position = "none"))
 
-(genabil_rel2_interplot_legend <- plot_model(genabil_rel2_mixmodel_fam, type = "eff", terms = c("sociodemo_PC1_resid [-6:6]", "neighborhood_PC1_resid")) +
+(genabil_rel2_interplot_legend <- plot_model(genabil_rel2_mixmodel_fam, type = "eff", 
+                                             terms = c("sociodemo_PC1_resid [-6:6]", "neighborhood_PC1_resid")) +
   theme_blank() +
     xlab("Sociodemographic Component Score") +
     ylab("General Cognitive Ability Component Score") +
@@ -1694,6 +1504,32 @@ figure_data <- abcd_data_final %>%
   mutate(release = ifelse(subject_id %in% first_release_subjects[[1]], 1, 2)) %>%
   left_join(race_eth, by = c("subject_id" = "subjectid"))
 
+rel1_figure_data <- figure_data %>%
+  filter(release == 1)
+
+rel2_figure_data <- figure_data %>%
+  filter(release == 2)
+
+cog_variance <- data.frame(tbpicvocab = var(rel1_figure_data$NIHtb_PicVocab),
+                           tbflanker = var(rel1_figure_data$NIHtb_Flanker),
+                           tblist = var(rel1_figure_data$NIHtb_List),
+                           tbcardsort = var(rel1_figure_data$NIHtb_CardSort), 
+                           tbpattern = var(rel1_figure_data$NIHtb_Pattern), 
+                           tbpicture = var(rel1_figure_data$NIHtb_Picture),
+                           tbreading = var(rel1_figure_data$NIHtb_Reading),
+                           ravlt = var(rel1_figure_data$RAVLT),
+                           littleman = var(rel1_figure_data$LMT))
+
+cog_variance[2,1] <- var(rel2_figure_data$NIHtb_PicVocab)
+cog_variance[2,2] <- var(rel2_figure_data$NIHtb_Flanker)
+cog_variance[2,3] <-var(rel2_figure_data$NIHtb_List)
+cog_variance[2,4] <- var(rel2_figure_data$NIHtb_CardSort)
+cog_variance[2,5] <-var(rel2_figure_data$NIHtb_Pattern)
+cog_variance[2,6] <-var(rel2_figure_data$NIHtb_Picture)
+cog_variance[2,7] <- var(rel2_figure_data$NIHtb_Reading)
+cog_variance[2,8] <-var(rel2_figure_data$RAVLT)
+cog_variance[2,9] <-var(rel2_figure_data$LMT)
+
 ```
 
 
@@ -1701,15 +1537,16 @@ figure_data <- abcd_data_final %>%
 ```{r}
 
 sociodemo_figs <- list()
+plot_margin <- theme(plot.margin = unit(c(1,1,1,1), "cm"))
 
 # Race/Ethnicity
 (sociodemo_figs[[1]] <- figure_data %>%
-  ggplot(., aes(race_ethnicity, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(race_ethnicity, group = factor(release), fill = factor(release))) +
+    geom_bar(stat = "count", position = "identity", color = "black", alpha = .5) +
     theme_classic() +
-    scale_fill_manual(values = c("#EBF094", "#EBF094")) +
-    scale_alpha_discrete(range = c(2, 0.45)) + 
+    scale_fill_manual(values = c("#889004", "#EBF094")) +
     ylim(0, 3000) +
+    ggtitle("") +
     theme(axis.title.x = element_blank(),
           axis.title.y = element_blank(),
           axis.text = element_blank(),
@@ -1718,11 +1555,10 @@ sociodemo_figs <- list()
 
 # household income
 (sociodemo_figs[[2]] <- figure_data %>%
-  ggplot(., aes(factor(Income), group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(factor(Income), group = factor(release), fill = factor(release))) +
+    geom_bar(stat = "count", position = "identity", color = "black", alpha = .5) +
     theme_classic() +
-    scale_fill_manual(values = c("#EBF094", "#EBF094")) +
-    scale_alpha_discrete(range = c(2, 0.45)) + 
+    scale_fill_manual(values = c("#889004", "#EBF094")) +
     ylim(0, 2000) +
     ggtitle("") + 
     theme(axis.title.x = element_blank(),
@@ -1731,94 +1567,87 @@ sociodemo_figs <- list()
           axis.ticks.length = unit(6, "pt"),
           legend.position = "none"))
 
+
 # caregiver education
 (sociodemo_figs[[3]] <- figure_data %>%
-  ggplot(., aes(factor(Education), group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(factor(Education), group = factor(release), fill = factor(release))) +
+    geom_bar(stat = "count", position = "identity", color = "black", alpha = .5) +
     theme_classic() +
-    scale_fill_manual(values = c("#EBF094", "#EBF094")) +
-    scale_alpha_discrete(range = c(2, 0.45)) +
-    ggtitle("") +
+    scale_fill_manual(values = c("#889004", "#EBF094")) +
     ylim(0, 2000) +
+    ggtitle("") +
     theme(axis.title.x = element_blank(),
           axis.title.y = element_blank(),
           axis.text = element_blank(),
-          axis.ticks.length = unit(6, "pt"), 
+          axis.ticks.length = unit(6, "pt"),
           legend.position = "none"))
 
-(sociodemo_histfig <- grid.arrange(sociodemo_figs[[1]], sociodemo_figs[[2]], sociodemo_figs[[3]],
+(sociodemo_histfig <- grid.arrange(grobs = lapply(sociodemo_figs, "+", plot_margin),
                                      heights = c(1, 1, 1),
                                      nrow = 3))
-
 ggsave('sociodemo_hist.png', sociodemo_histfig, height = 17, width = 10)
 
 ```
 
 #### Home environment histograms 
 ```{r}
-# (sociodemo_figs_arrange <- grid.arrange(grobs = sociodemo_figs, ncol = 2) )
-# ggsave('sociodemo_figs.png', sociodemo_figs_arrange, height = 9, width = 13)
 
 ##### Home #####
 home_figs <- list()
+plot_margin <- theme(plot.margin = unit(c(1,2,2,2), "cm"))
 
 (home_figs[[1]] <- figure_data %>%
-  ggplot(., aes(ParentAcceptance, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(factor(FamConflict_P), group = factor(release), fill = factor(release))) +
+    geom_bar(stat = "count", position = "identity", color = "black", alpha = .5) +
     theme_classic() +
-    scale_fill_manual(values = c("#B1D8B7", "#B1D8B7")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#5EAC6B", "#B1D8B7")) +
+    ggtitle("")+
+    ylim(0, 1150) +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (home_figs[[2]] <- figure_data %>%
-  ggplot(., aes(ParentMonitoring, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_histogram(color = "grey") +
+  ggplot(., aes(FamConflict_Y, group = factor(release), fill = factor(release))) +
+    geom_bar(stat = "count", position = "identity", color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#B1D8B7", "#B1D8B7")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#5EAC6B", "#B1D8B7")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (home_figs[[3]] <- figure_data %>%
-  ggplot(., aes(FamConflict_P, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(ParentAcceptance, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = .5) +
     theme_classic() +
-    scale_fill_manual(values = c("#B1D8B7", "#B1D8B7")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#5EAC6B", "#B1D8B7")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (home_figs[[4]] <- figure_data %>%
-  ggplot(., aes(FamConflict_Y, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(color = "grey", position = "dodge") +
+  ggplot(., aes(ParentMonitoring, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = .5) +
     theme_classic() +
-    scale_fill_manual(values = c("#B1D8B7", "#B1D8B7")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#5EAC6B", "#B1D8B7")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
-
-(home_histfig <- grid.arrange(home_figs[[1]], home_figs[[2]], home_figs[[3]], home_figs[[4]],
+(home_histfig <- grid.arrange(grobs = lapply(home_figs, "+", plot_margin),
                                      heights = c(1, 1),
                                      nrow = 2))
-
 ggsave('home_hist.png', home_histfig, height = 17, width = 20)
 
 ```
@@ -1826,261 +1655,267 @@ ggsave('home_hist.png', home_histfig, height = 17, width = 20)
 ```{r}
 ##### School #####
 school_figs <- list()
+plot_margin <- theme(plot.margin = unit(c(1,1,1,1), "cm"))
 
 (school_figs[[1]] <- figure_data %>%
-  ggplot(., aes(SchoolInvolvement, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(SchoolDisengagement, group = factor(release), fill = factor(release))) +
+    geom_bar(stat = "count", position = "identity", color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#7CC644", "#7CC644")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#58AD18", "#7CC644")) +
+    ggtitle("") +
+    ylim(0, 1500) +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (school_figs[[2]] <- figure_data %>%
-  ggplot(., aes(SchoolEnvironment, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(SchoolInvolvement, group = factor(release), fill = factor(release))) +
+    geom_bar(stat = "count", position = "identity", color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#7CC644", "#7CC644")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#58AD18", "#7CC644")) +
+    ggtitle("" ) +
+    ylim(0, 1050) +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (school_figs[[3]] <- figure_data %>%
-  ggplot(., aes(SchoolDisengagement, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(SchoolEnvironment, group = factor(release), fill = factor(release))) +
+    geom_bar(stat = "count", position = "identity", color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#7CC644", "#7CC644")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#58AD18", "#7CC644")) +
+    ggtitle("") +
+    ylim(0, 850) +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
-
-(school_histfig <- grid.arrange(school_figs[[1]], school_figs[[2]], school_figs[[3]],
+(school_histfig <- grid.arrange(grobs = lapply(school_figs, "+", plot_margin),
                                      heights = c(1, 1, 1),
                                      nrow = 3))
-
 ggsave('school_hist.png', school_histfig, height = 17, width = 10)
 
 ```
 
 ```{r}
-
 ##### Neighborhood #####
 neighborhood_figs <- list()
+plot_margin <- theme(plot.margin = unit(c(1,2,2,2), "cm"))
 
 (neighborhood_figs[[1]] <- figure_data %>%
-  ggplot(., aes(ADI_PercFamPoverty, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(ADI_PercFamPoverty, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#16A637", "#16A637")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#12812C", "#16A637")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (neighborhood_figs[[2]] <- figure_data %>%
-  ggplot(., aes(ADI_PercPovBelow138, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(ADI_PercPovBelow138, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#16A637", "#16A637")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#12812C", "#16A637")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (neighborhood_figs[[3]] <- figure_data %>%
-  ggplot(., aes(ADI_PercSingle, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(ADI_PercSingle, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#16A637", "#16A637")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#12812C", "#16A637")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (neighborhood_figs[[4]] <- figure_data %>%
-  ggplot(., aes(ADI_IncDisparityIdx, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(ADI_IncDisparityIdx, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5 ) +
     theme_classic() +
-    scale_fill_manual(values = c("#16A637", "#16A637")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#12812C", "#16A637")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (neighborhood_figs[[5]] <- figure_data %>%
-  ggplot(., aes(ADI_MedianFamInc, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(ADI_MedianFamInc, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#16A637", "#16A637")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#12812C", "#16A637")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (neighborhood_figs[[6]] <- figure_data %>%
-  ggplot(., aes(ADI_PercHOwner, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(ADI_PercHOwner, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#16A637", "#16A637")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#12812C", "#16A637")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (neighborhood_figs[[7]] <- figure_data %>%
-  ggplot(., aes(ADI_Edu_HSDip, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(ADI_Edu_HSDip, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#16A637", "#16A637")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#12812C", "#16A637")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
-(neighborhood_histfig <- grid.arrange(neighborhood_figs[[1]], neighborhood_figs[[2]], neighborhood_figs[[3]],
-                                      neighborhood_figs[[4]], neighborhood_figs[[5]], neighborhood_figs[[6]],
-                                      neighborhood_figs[[7]],
-                                     heights = c(1, 1, 1, 1),
-                                     nrow = 4))
+(neighborhood_figs[[8]] <- figure_data %>%
+  ggplot(., aes(ADI_Edu_LTHS, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
+    theme_classic() +
+    scale_fill_manual(values = c("#12812C", "#16A637")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
-ggsave('neighborhood_hist.png', neighborhood_histfig, height = 17, width = 10)
+(neighborhood_figs[[9]] <- figure_data %>%
+  ggplot(., aes(ADI_PercUnemp, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
+    theme_classic() +
+    scale_fill_manual(values = c("#12812C", "#16A637")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
+
+(neighborhood_histfig <- grid.arrange(grobs = lapply(neighborhood_figs, "+", plot_margin),
+                                     heights = c(1, 1, 1),
+                                     nrow = 3))
+ggsave('neighborhood_hist.png', neighborhood_histfig, height = 17, width = 17)
 
 ```
 
 ```{r}
 ##### Culture #####
 culture_figs <- list()
+plot_margin <- theme(plot.margin = unit(c(1,2,2,2), "cm"))
 
 (culture_figs[[1]] <- figure_data %>%
-  ggplot(., aes(EthIdentExploration, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(EthIdentExploration, group = factor(release), fill = factor(release))) +
+    geom_density( color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#116530", "#116530")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#0D5126", "#116530")) +
+    ggtitle("")  +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (culture_figs[[2]] <- figure_data %>%
-  ggplot(., aes(EthIdentCommitment, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(EthIdentCommitment, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#116530", "#116530")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#0D5126", "#116530")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (culture_figs[[3]] <- figure_data %>%
-  ggplot(., aes(FamObligation, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(FamObligation, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#116530", "#116530")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#0D5126", "#116530")) +
+    ggtitle("")  +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (culture_figs[[4]] <- figure_data %>%
-  ggplot(., aes(FamReferent, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(FamReferent, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#116530", "#116530")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#0D5126", "#116530")) +
+    ggtitle("")  +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (culture_figs[[5]] <- figure_data %>%
-  ggplot(., aes(FamSupport, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(FamSupport, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#116530", "#116530")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#0D5126", "#116530")) +
+    ggtitle("")  +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (culture_figs[[6]] <- figure_data %>%
-  ggplot(., aes(IndepSelfReliance, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(IndepSelfReliance, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values =c("#116530", "#116530")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values =c("#0D5126", "#116530")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
 (culture_figs[[7]] <- figure_data %>%
-  ggplot(., aes(Religion, group = factor(release), fill = factor(release), alpha = factor(release))) +
-    geom_bar(stat = "count", position = "dodge", color = "grey") +
+  ggplot(., aes(Religion, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
     theme_classic() +
-    scale_fill_manual(values = c("#116530", "#116530")) +
-    scale_alpha_discrete(range = c(2, 0.45)) ) 
-    # ylim(0, 3000) +
-    # theme(axis.title.x = element_blank(),
-    #       axis.title.y = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks.length = unit(6, "pt"),
-    #       legend.position = "none"))
+    scale_fill_manual(values = c("#0D5126", "#116530")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
-
-(culture_figs_arrange <- grid.arrange(grobs = culture_figs, ncol = 2) 
-    )
-
-ggsave('culture_figs.png', culture_figs_arrange, height = 9, width = 13)
+(culture_figs_arrange <- grid.arrange(grobs = lapply(culture_figs, "+", plot_margin), 
+                                      heights = c(1, 1, 1, 1),
+                                     nrow = 4) )
+ggsave('culture_hist.png', culture_figs_arrange, height = 17, width = 10)
 
 
 ```
@@ -2089,21 +1924,219 @@ ggsave('culture_figs.png', culture_figs_arrange, height = 9, width = 13)
 ```{r}
 ##### Cog measures #####
 cog_figs <- list()
+plot_margin <- theme(plot.margin = unit(c(1,2,2,2), "cm"))
 
-for(i in 40:ncol(CombMeasures_resid)){
-  
-  cog_figs[[i-39]] <- ggplot(CombMeasures_resid) +
-    geom_histogram(aes_string(colnames(CombMeasures_resid)[i])) +
-    theme_classic()+
-    theme(text = element_text(size = 5))
-}
+(cog_figs[[1]] <- figure_data %>%
+  ggplot(., aes(NIHtb_PicVocab, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
+    theme_classic() +
+    scale_fill_manual(values = c("#0884AF", "#0FADE4")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
-(cog_figs_arrange <- grid.arrange(grobs = cog_figs, ncol = 2) 
-    )
+(cog_figs[[2]] <- figure_data %>%
+  ggplot(., aes(NIHtb_Flanker, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
+    theme_classic() +
+    scale_fill_manual(values = c("#0884AF", "#0FADE4")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
 
-ggsave('cog_figs.png', cog_figs_arrange, height = 9, width = 13)
+(cog_figs[[7]] <- figure_data %>%
+  ggplot(., aes(NIHtb_List, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
+    theme_classic() +
+    scale_fill_manual(values = c("#0884AF", "#0FADE4")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
+
+(cog_figs[[4]] <- figure_data %>%
+  ggplot(., aes(NIHtb_CardSort, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
+    theme_classic() +
+    scale_fill_manual(values = c("#0884AF", "#0FADE4")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
+
+(cog_figs[[5]] <- figure_data %>%
+  ggplot(., aes(NIHtb_Pattern, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
+    theme_classic() +
+    scale_fill_manual(values = c("#0884AF", "#0FADE4")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
+
+(cog_figs[[6]] <- figure_data %>%
+  ggplot(., aes(NIHtb_Picture, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
+    theme_classic() +
+    scale_fill_manual(values = c("#0884AF", "#0FADE4")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
+
+(cog_figs[[3]] <- figure_data %>%
+  ggplot(., aes(NIHtb_Reading, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
+    theme_classic() +
+    scale_fill_manual(values = c("#0884AF", "#0FADE4")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
+
+(cog_figs[[8]] <- figure_data %>%
+  ggplot(., aes(RAVLT, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
+    theme_classic() +
+    scale_fill_manual(values = c("#0884AF", "#0FADE4")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
+
+(cog_figs[[9]] <- figure_data %>%
+  ggplot(., aes(LMT, group = factor(release), fill = factor(release))) +
+    geom_density(color = "black", alpha = 0.5) +
+    theme_classic() +
+    scale_fill_manual(values = c("#0884AF", "#0FADE4")) +
+    ggtitle("") +
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks.length = unit(6, "pt"),
+          legend.position = "none"))
+
+(cog_figs_arrange <- grid.arrange(grobs = lapply(cog_figs, "+", plot_margin), 
+                                      heights = c(1, 1, 1),
+                                     nrow = 3) )
+ggsave('cog_hist.png', cog_figs_arrange, height = 17, width = 17)
 ```
 
+### Sociodemographic and Environment component variable scores
+```{r}
+home_pc_varload <- data.table(variable = rownames(rel2_home_pca$var$coord), 
+                              rel1 = rel1_home_pca$var$coord[,1],
+                              rel2 = rel2_home_pca$var$coord[,1])
+
+school_pc_varload <- data.table(variable = rownames(rel2_school_pca$var$coord), 
+                              rel1 = rel1_school_pca$var$coord[,1],
+                              rel2 = rel2_school_pca$var$coord[,1])
+
+neighborhood_pc_varload <- data.table(variable = rownames(rel2_neighborhood_pca$var$coord), 
+                              rel1 = rel1_neighborhood_pca$var$coord[,1],
+                              rel2 = rel2_neighborhood_pca$var$coord[,1])
+
+culture_pc_varload <- data.table(variable = rownames(rel2_culture_pca$var$coord), 
+                              rel1 = rel1_culture_pca$var$coord[,1],
+                              rel2 = rel2_culture_pca$var$coord[,1])
+
+sociodemo_pc_varload <- data.table(variable = rownames(rel2_sociodemo_pca$var$coord), 
+                              rel1 = rel1_sociodemo_pca$var$coord[,1],
+                              rel2 = rel2_sociodemo_pca$var$coord[,1])
+
+write.csv(home_pc_varload, "varload_homepc.csv")
+write.csv(school_pc_varload, "varload_schoolpc.csv")
+write.csv(neighborhood_pc_varload, "varload_neighborhoodpc.csv")
+write.csv(culture_pc_varload, "varload_culturepc.csv")
+write.csv(sociodemo_pc_varload, "varload_sociodemopc.csv")
+
+```
+
+### Neighborhood x sociodemographic interaction plot with observed values
+```{r}
+#create factor for levels of neighborhood PC
+## release 1
+first_release_data <- first_release_data %>%
+  mutate(neighborhood_level = NA)
+
+mean_neighborhood_rel1 <- mean(first_release_data$neighborhood_PC1_resid)
+sd_neighborhood_rel1 <- sd(first_release_data$neighborhood_PC1_resid)
+
+first_release_data[first_release_data[,"neighborhood_PC1_resid"] >= mean_neighborhood_rel1 + sd_neighborhood_rel1, "neighborhood_level"] <- "high"
+first_release_data[first_release_data[,"neighborhood_PC1_resid"] <= mean_neighborhood_rel1 - sd_neighborhood_rel1, "neighborhood_level"] <- "low"
+first_release_data[is.na(first_release_data$neighborhood_level), "neighborhood_level"] <- "mean"
+
+## release 2 
+second_release_data <- second_release_data %>%
+  mutate(neighborhood_level = NA)
+
+mean_neighborhood_rel2 <- mean(second_release_data$neighborhood_PC1_resid)
+sd_neighborhood_rel2 <- sd(second_release_data$neighborhood_PC1_resid)
+
+second_release_data[second_release_data[,"neighborhood_PC1_resid"] >= mean_neighborhood_rel2 + sd_neighborhood_rel2, "neighborhood_level"] <- "high"
+second_release_data[second_release_data[,"neighborhood_PC1_resid"] <= mean_neighborhood_rel2 - sd_neighborhood_rel2, "neighborhood_level"] <- "low"
+second_release_data[is.na(second_release_data$neighborhood_level), "neighborhood_level"] <- "mean"
+factor(second_release_data$neighborhood_level, levels = c("low", "mean", "high"))
+
+(genabil_rel1_inter_obsplot <- ggplot() +
+  theme_blank() +
+   geom_point(data = first_release_data, mapping = aes(x = sociodemo_PC1_resid, y = Neurocog_BPPC1_GenAbility_resid, color = factor(neighborhood_level)), 
+              alpha = 0.5, size = 0.5) +
+    xlab("Sociodemographic Component Score") +
+    ylab("General Cognitive Ability Component Score") +
+    ggtitle("Discovery Sample: Observed Values of General Cognitive Ability") +
+    scale_colour_discrete(name = "Neighborhood Env. Component Score", 
+                          labels = c("-1 SD (Less Enriched)", "Mean", "+1 SD (More Enriched)")) + 
+    scale_color_manual(values = c("blue", "red", "green3")) +
+    xlim(-5,3) +
+    theme(legend.position = "none"))
+
+
+(genabil_rel2_inter_obsplot <- ggplot() + 
+  theme_blank() +
+   geom_point(data = second_release_data, mapping = aes(x = sociodemo_PC1_resid, y = Neurocog_BPPC1_GenAbility_resid, color = factor(neighborhood_level)), 
+              alpha = 0.5, size = 0.5) +
+    xlab("Sociodemographic Component Score") +
+    ylab("General Cognitive Ability Component Score") +
+    ggtitle("Replication Sample: Observed Values of General Cognitive Ability") +
+    scale_colour_discrete(name = "Neighborhood Env. Component Score", 
+                          labels = c("-1 SD (Less Enriched)", "Mean", "+1 SD (More Enriched)")) + 
+    scale_color_manual(values = c("blue", "red", "green3")) +
+    xlim(-5,3) +
+    theme(legend.position = "none"))
+
+(genabil_rel2_inter_obsplot_legend <- ggplot() + 
+  theme_blank() +
+    geom_point(data = second_release_data, mapping = aes(x = sociodemo_PC1_resid, y = Neurocog_BPPC1_GenAbility_resid, color = factor(neighborhood_level)), 
+              alpha = 0.5, size = 0.5) +
+    xlab("Sociodemographic Component Score") +
+    ylab("General Cognitive Ability Component Score") +
+    ggtitle("Replication Sample: Observed Values of General Cognitive Ability") +
+    
+    scale_color_manual(values = c("blue", "red", "green3")) +
+    xlim(-5,3) +
+    theme(legend.position = "bottom") + 
+    guides(colour = guide_legend(override.aes = list(size=4))))
+
+```
 
 ### Redo analyses with log transformed income variable 
 ```{r}
@@ -2229,18 +2262,15 @@ second_release_resid_loginc <- second_release_data_loginc %>%
                 sociodemo_PC1_resid, Neurocog_BPPC1_GenAbility_resid, Neurocog_BPPC2_ExecFunc_resid, Neurocog_BPPC3_LearnMem_resid)
 
 # release 1 participant loading comparison for standard income var and log transformed
-
 (rel1_sociodemo_logcor <- cor.test(first_release_data$sociodemo_PC1_resid, first_release_data_loginc$sociodemo_PC1_resid, method = "spearman"))
 
 # release 2 
-
 (rel2_sociodemo_logcor <- cor.test(second_release_data$sociodemo_PC1_resid, second_release_data_loginc$sociodemo_PC1_resid, method = "spearman"))
 
 ```
 
 ### Mixed effects models with log transformed income
 ```{r}
-
 ## General ability
 genabil_rel1_mixmodel_loginc <- lmer(Neurocog_BPPC1_GenAbility_resid ~ sociodemo_PC1_resid + home_PC1_resid + school_PC1_resid + neighborhood_PC1_resid + 
                                 culture_PC1_resid + sociodemo_PC1_resid:home_PC1_resid + sociodemo_PC1_resid:school_PC1_resid +
@@ -2300,4 +2330,5 @@ summary(learnmem_rel2_mixmodel_loginc)
 (rsq_learnmem_rel1_mixmodel_loginc <- r.squaredGLMM(learnmem_rel1_mixmodel_loginc))
 (rsq_learnmem_rel2_mixmodel_loginc <- r.squaredGLMM(learnmem_rel2_mixmodel_loginc))
 ```
+
 
